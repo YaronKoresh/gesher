@@ -1,0 +1,171 @@
+name: Autobot Manager
+
+on:
+  issues:
+    types: [opened, closed, reopened]
+  pull_request:
+    types: [opened, closed, synchronize]
+    branches: [main]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  milestones: write
+
+jobs:
+  project-manager:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Apply Labels
+        if: github.event_name == 'pull_request'
+        uses: actions/labeler@v6
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          sync-labels: false
+
+      - name: Manage Project
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const payload = context.payload;
+            const issueNumber = context.issue.number;
+
+            async function getOrCreateMilestone() {
+              const milestones = await github.rest.issues.listMilestones({
+                owner, repo, state: 'open', sort: 'due_on', direction: 'asc'
+              });
+
+              if (milestones.data.length > 0) {
+                return milestones.data[0];
+              }
+
+              let nextVersion = "v0.0.1";
+              try {
+                const releases = await github.rest.repos.listReleases({ owner, repo });
+                if (releases.data.length > 0) {
+                  const lastTag = releases.data[0].tag_name;
+                  const parts = lastTag.replace('v', '').split('.').map(Number);
+                  parts[2] += 1;
+                  nextVersion = `v${parts.join('.')}`;
+                }
+              } catch (e) {
+                console.log("Error fetching releases, defaulting to v0.0.1");
+              }
+
+              const created = await github.rest.issues.createMilestone({
+                owner, repo, title: nextVersion
+              });
+              return created.data;
+            }
+
+            if (['opened', 'synchronize', 'reopened'].includes(payload.action)) {
+              const milestone = await getOrCreateMilestone();
+
+              const currentMilestone = payload.issue?.milestone || payload.pull_request?.milestone;
+              if (!currentMilestone) {
+                await github.rest.issues.update({
+                  owner, repo, issue_number: issueNumber, milestone: milestone.number
+                });
+                console.log(`📌 Assigned issue #${issueNumber} to milestone ${milestone.title}`);
+              }
+
+              const items = await github.paginate(github.rest.issues.listForRepo, {
+                owner, repo, milestone: milestone.number, state: 'all'
+              });
+
+              const hasFeature = items.some(i =>
+                i.labels.some(l => l.name.includes('enhancement') || l.name.includes('feat'))
+              );
+
+              const rawParts = milestone.title.replace('v', '').split('.').map(Number);
+              let [major, minor, patch] = [
+                  rawParts[0] || 0,
+                  rawParts[1] || 0,
+                  rawParts[2] || 0
+              ];
+
+              let newTitle = milestone.title;
+
+              const isBreaking = items.some(i =>
+                i.labels.some(l => l.name.includes('breaking') || l.name.includes('major'))
+              );
+
+              if (isBreaking) {
+                  major++;
+                  minor = 0;
+                  patch = 0;
+                  newTitle = `v${major}.${minor}.${patch}`;
+              } else if (hasFeature) {
+                  minor++;
+                  patch = 0;
+                  newTitle = `v${major}.${minor}.${patch}`;
+              }
+
+              if (newTitle !== milestone.title) {
+                await github.rest.issues.updateMilestone({
+                  owner, repo, milestone_number: milestone.number, title: newTitle
+                });
+                console.log(`🚀 Upgraded milestone to ${newTitle} (Feature detected)`);
+              }
+            }
+
+            if (payload.action === 'closed') {
+              const mData = payload.issue?.milestone || payload.pull_request?.milestone;
+              if (!mData) return;
+
+              const freshMilestone = await github.rest.issues.getMilestone({
+                owner, repo, milestone_number: mData.number
+              });
+
+              if (freshMilestone.data.open_issues === 0 &&
+                  freshMilestone.data.state === 'open' &&
+                  freshMilestone.data.closed_issues > 0) {
+
+                 const version = freshMilestone.data.title;
+                 const allOpen = await github.rest.issues.listMilestones({
+                   owner, repo, state: 'open'
+                 });
+
+                 const parseVer = (v) => {
+                    const parts = v.replace('v', '').split('.').map(Number);
+                    return (parts[0] * 1000000) + (parts[1] * 1000) + parts[2];
+                 };
+
+                 const currentVal = parseVer(version);
+
+                 const olderExists = allOpen.data.some(m => {
+                    if (m.number === freshMilestone.data.number) return false;
+                    return parseVer(m.title) < currentVal;
+                 });
+
+                 if (olderExists) {
+                    console.log(`⚠️ blocked release of ${version} because an older milestone is still open.`);
+                    return;
+                 }
+
+                 console.log(`🎉 Milestone ${version} complete. Releasing...`);
+
+                 await github.rest.issues.updateMilestone({
+                   owner, repo, milestone_number: freshMilestone.data.number, state: 'closed'
+                 });
+
+                 await github.rest.repos.createRelease({
+                   owner, repo,
+                   tag_name: version,
+                   name: version,
+                   generate_release_notes: true
+                 });
+
+                 const parts = version.replace('v', '').split('.').map(Number);
+                 parts[2] += 1;
+                 const nextVersion = `v${parts.join('.')}`;
+
+                 await github.rest.issues.createMilestone({
+                    owner, repo, title: nextVersion
+                 });
+              }
+            }

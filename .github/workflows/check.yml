@@ -1,0 +1,134 @@
+name: Check
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  lint-and-fix:
+    runs-on: ubuntu-latest
+    outputs:
+      has_changes: ${{ steps.check_changes.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Linting Tools
+        run: pip install ruff
+
+      - name: Apply Fixes
+        run: |
+          ruff check --fix . || true
+          ruff format .
+
+      - name: Generate Suggestion JSON
+        id: check_changes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "changed=true" >> $GITHUB_OUTPUT
+
+          PREVIOUS_REVIEWS=$(gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews" --jq '.[] | select(.user.login=="github-actions[bot]") | .id')
+          for REVIEW_ID in $PREVIOUS_REVIEWS; do
+            gh api -X POST "repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews/$REVIEW_ID/dismissals" -f message="Superseded by new fixes" || true
+          done
+
+          python3 - <<'EOF'
+          import subprocess, json, os, re
+
+          def get_suggestions():
+              diff = subprocess.check_output(['git', 'diff', '-U0']).decode()
+              comments = []
+              files = re.split(r'^diff --git', diff, flags=re.M)
+              for f_content in files:
+                  if not f_content.strip(): continue
+                  file_match = re.search(r'^\+\+\+ b/(.*)', f_content, re.M)
+                  if not file_match: continue
+                  current_file = file_match.group(1)
+                  hunks = re.split(r'^@@', f_content, flags=re.M)
+                  for hunk in hunks[1:]:
+                      header, *lines = hunk.splitlines()
+                      match = re.search(r'\+(\d+)(?:,(\d+))?', header)
+                      if not match: continue
+                      new_start = int(match.group(1))
+                      new_len = int(match.group(2) or 1)
+                      suggested_code = [l[1:] for l in lines if l.startswith('+')]
+                      comments.append({
+                          "path": current_file,
+                          "side": "RIGHT",
+                          "line": new_start + new_len - 1,
+                          "start_line": new_start,
+                          "body": "```suggestion\n" + "\n".join(suggested_code) + "\n```"
+                      })
+              return comments
+
+          suggestions = get_suggestions()
+          if suggestions:
+              review = {
+                  "body": "Automated Fixes Applied: The following changes were verified by the build process. Review and commit them below.",
+                  "event": "COMMENT",
+                  "comments": suggestions
+              }
+              with open('review.json', 'w') as f:
+                  json.dump(review, f)
+          EOF
+
+      - name: Upload Fixes and Review
+        uses: actions/upload-artifact@v6
+        with:
+          name: fixed-code
+          path: |
+            .
+            review.json
+
+  test-matrix:
+    needs: lint-and-fix
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - name: Download Fixed Code
+        uses: actions/download-artifact@v7
+        with:
+          name: fixed-code
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install dependencies & Test
+        run: |
+          pip install ".[dev]"
+          pytest
+
+  post-suggestions:
+    needs: [lint-and-fix, test-matrix]
+    if: needs.lint-and-fix.outputs.has_changes == 'true' && success()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Review Artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: fixed-code
+
+      - name: Submit PR Review
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh api "repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews" --input review.json
+
+          echo "Changes suggested. Marking workflow as failed."
+          exit 1

@@ -1,0 +1,92 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gesher"
+version = "1.0.0"
+description = "A secure, pure-Python HTTP tunnel to expose local services to the internet."
+readme = "README.md"
+license = {text = "GPL-3.0-or-later"}
+requires-python = ">=3.8"
+authors = [
+    {name = "Yaron Koresh"},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Utilities",
+]
+keywords = ["repository", "tunneling", "networking"]
+dependencies = [
+    "requests",
+    "fastapi",
+    "uvicorn[standard]",
+    "cryptography"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+    "poethepoet",
+    "pre-commit",
+    "build"
+]
+
+[project.scripts]
+gesher = "gesher.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/YaronKoresh/gesher"
+Repository = "https://github.com/YaronKoresh/gesher"
+Issues = "https://github.com/YaronKoresh/gesher/issues"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+# --- RUFF CONFIGURATION ---
+[tool.ruff]
+target-version = "py38"
+line-length = 120
+
+[tool.ruff.lint]
+# E/W (Standard), F (Pyflakes), I (Import Sorting), B (Bugbear/Best Practices), UP (Upgrade Syntax)
+select = ["E", "W", "F", "I", "B", "UP"]
+ignore = []
+fixable = ["ALL"]
+
+[tool.ruff.lint.isort]
+force-single-line = false
+combine-as-imports = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# --- POE TASKS ---
+[tool.poe.tasks]
+# Project Development
+dev = "uvicorn gesher.server:app --reload"
+
+# Quality Assurance
+lint = "ruff check . --fix"
+format = "ruff format ."
+test = "pytest tests/"
+check = ["format", "lint", "test"]
+
+# Build Pipeline
+build = { cmd = "python -m build" }
+
+# Setup Task
+hook = { cmd = "pre-commit install" }
