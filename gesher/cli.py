@@ -2,7 +2,6 @@ import argparse
 import os
 import platform
 import re
-import secrets
 import subprocess
 import tarfile
 import time

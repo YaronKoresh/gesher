@@ -6,9 +6,8 @@ from gesher import cli
 
 class TestCLI(unittest.TestCase):
     @patch("gesher.cli.run_server")
-    @patch("gesher.cli.secrets.token_hex", return_value="auto-secret")
-    def test_server_mode_defaults(self, mock_secrets, mock_run_server):
-        test_args = ["gesher", "server"]
+    def test_server_mode_defaults(self, mock_run_server):
+        test_args = ["gesher", "server", "--secret", "auto-secret"]
         with patch("sys.argv", test_args):
             cli.main()
 
@@ -27,7 +26,9 @@ class TestCLI(unittest.TestCase):
         test_args = [
             "gesher",
             "client",
+            "--gateway",
             "http://my-gateway.com",
+            "--secret",
             "mykey",
             "--pin",
             "ABC123",
@@ -47,7 +48,7 @@ class TestCLI(unittest.TestCase):
     def test_server_public_mode(self, mock_run, mock_cf, mock_sub):
         mock_cf.return_value = (None, "https://random.trycloudflare.com")
 
-        test_args = ["gesher", "server", "--public"]
+        test_args = ["gesher", "server", "--secret", "my-key", "--public"]
         with patch("sys.argv", test_args):
             cli.main()
 
