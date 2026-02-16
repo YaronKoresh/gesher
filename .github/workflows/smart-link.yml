@@ -1,0 +1,68 @@
+name: Smart Auto-Linker
+
+on:
+  pull_request:
+    types: [opened]
+
+permissions:
+  issues: read
+  pull-requests: write
+
+jobs:
+  link-issue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find and Link Relevant Issue
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pr = context.payload.pull_request;
+            const textToAnalyze = (pr.title + " " + (pr.body || "")).toLowerCase();
+            const stopWords = ['fix', 'fixed', 'fixes', 'feat', 'feature', 'chore', 'docs', 'style', 'refactor', 'test', 'update', 'add', 'remove', 'change', 'the', 'a', 'an', 'to', 'for', 'in', 'of', 'with', 'and', 'or', 'is', 'it'];
+            const keywords = textToAnalyze
+              .replace(/[^\w\s]/g, '')
+              .split(/\s+/)
+              .filter(w => !stopWords.includes(w) && w.length > 3)
+              .slice(0, 5) // Take top 5 unique words to avoid search query limits
+              .join(' ');
+
+            if (!keywords) {
+              console.log("Could not extract meaningful keywords.");
+              return;
+            }
+
+            console.log(`🔍 Searching open issues for: "${keywords}"`);
+
+            const query = `repo:${owner}/${repo} is:issue state:open ${keywords} in:title,body`;
+            let search = null;
+            try {
+              search = await github.rest.search.issuesAndPullRequests({
+                q: query,
+                sort: 'relevance',
+                per_page: 1
+              });
+
+              if (search.data.items.length === 0) {
+                console.log("No matching issues found.");
+                return;
+              }
+
+              const bestMatch = search.data.items[0];
+              console.log(`✅ Found Match: #${bestMatch.number} - "${bestMatch.title}"`);
+
+              if (pr.body && pr.body.includes(`#${bestMatch.number}`)) {
+                console.log("Already linked.");
+                return;
+              }
+
+              await github.rest.pulls.update({
+                owner,
+                repo,
+                pull_number: pr.number,
+                body: `${pr.body || ""}\n\nCloses #${bestMatch.number}`
+              });
+
+            } catch (e) {
+              console.log("Rate limit exceeded");
+            }
