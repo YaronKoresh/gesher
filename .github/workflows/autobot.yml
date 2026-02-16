@@ -35,7 +35,7 @@ jobs:
 
             const MIN_RELEASE_SIZE = 3;
             const FORCE_RELEASE_TYPES = ['enhancement', 'breaking-change', 'security'];
-            const IGNORE_LABELS = ['documentation', 'chore', 'test', 'ci', 'refactor', 'dependencies'];
+            const IGNORE_LABELS = ['documentation', 'chore', 'test', 'ci', 'refactor', 'dependencies', 'build'];
 
             const labelDefinitions = {
               'bug': { color: 'd73a4a', description: "Something isn't working" },
@@ -49,7 +49,10 @@ jobs:
               'test': { color: 'cc317c', description: "Adding, missing, or correcting tests" },
               'ci': { color: '006b75', description: "CI/CD and workflow updates" },
               'dependencies': { color: '0366d6', description: "Dependency updates" },
-              'database': { color: 'fbca04', description: "Database migrations or schema changes" }
+              'database': { color: 'fbca04', description: "Database migrations or schema changes" },
+              'build': { color: '89590b', description: "Build system and tooling updates" },
+              'accessibility': { color: 'c2e0c6', description: "Accessibility (a11y) improvements" },
+              'localization': { color: '91d674', description: "Localization (i18n) and translation" }
             };
 
             async function ensureLabelExists(name) {
@@ -65,38 +68,69 @@ jobs:
               }
             }
 
-            async function applyTitleLabels() {
+            async function analyzeAndLabel() {
               const title = payload.pull_request?.title || payload.issue?.title || "";
-              const labelsToAdd = [];
+              const branch = payload.pull_request?.head?.ref || "";
+              const body = payload.pull_request?.body || payload.issue?.body || "";
               
-              const patterns = {
-                'bug': ['fix', 'fixed', 'fixing', 'bug', 'bugs', 'hotfix', 'patch', 'issue', 'issues', 'error', 'errors', 'defect', 'crash', 'crashes', 'fail', 'fails', 'broken'],
-                'enhancement': ['feat', 'feature', 'features', 'add', 'added', 'adding', 'new', 'improve', 'improved', 'improving', 'implement', 'expose'],
-                'documentation': ['docs', 'doc', 'document', 'documentation', 'readme', 'license', 'typo', 'typos', 'grammar', 'copy', 'edit', 'editor'],
-                'breaking-change': ['breaking', 'major', 'rewrite', 'overhaul', 'migration', 'drop support', 'remove api', 'change api', 'api change'],
-                'ui': ['ui', 'ux', 'style', 'styles', 'css', 'scss', 'design', 'theme', 'dark mode', 'responsive', 'layout', 'asset', 'font'],
-                'performance': ['perf', 'performance', 'speed', 'fast', 'slow', 'optimize', 'optimization', 'memory', 'leak', 'compress'],
-                'security': ['sec', 'security', 'secure', 'insecure', 'vuln', 'vulnerability', 'cve', 'auth', 'authorize', 'token', 'secret'],
-                'refactor': ['refactor', 'clean', 'cleanup', 'structure', 'reorganize', 'simplify', 'format', 'lint', 'prettier'],
-                'test': ['test', 'tests', 'testing', 'spec', 'specs', 'jest', 'mocha', 'cypress', 'e2e', 'unit', 'coverage'],
-                'ci': ['ci', 'cd', 'workflow', 'pipeline', 'action', 'actions', 'deploy', 'release', 'bot'],
-                'dependencies': ['deps', 'dependency', 'dependencies', 'bump', 'upgrade', 'downgrade', 'npm', 'yarn', 'package'],
-                'database': ['db', 'database', 'sql', 'mysql', 'postgres', 'mongo', 'schema', 'migration', 'query', 'model']
+              const text = `${title} ${branch} ${body}`.toLowerCase();
+              const detectedLabels = new Set();
+
+              const dictionaries = {
+                'bug': ['fix', 'fixed', 'fixing', 'bug', 'bugs', 'hotfix', 'patch', 'issue', 'issues', 'error', 'errors', 'defect', 'crash', 'crashes', 'fail', 'fails', 'broken', 'glitch', 'exception', 'null', 'undefined', 'infinite', 'regression', '404', '500'],
+                'enhancement': ['feat', 'feature', 'features', 'add', 'added', 'adding', 'new', 'improve', 'improved', 'improving', 'implement', 'expose', 'support', 'introduce', 'create', 'ability', 'capability', 'provider', 'service', 'module', 'user story'],
+                'documentation': ['docs', 'doc', 'document', 'documentation', 'readme', 'license', 'typo', 'typos', 'grammar', 'copy', 'edit', 'editor', 'wiki', 'changelog', 'guide', 'manual', 'reference', 'javadoc', 'jsdoc', 'comment', 'comments'],
+                'breaking-change': ['breaking', 'major', 'rewrite', 'overhaul', 'migration', 'incompatible', 'deprecate', 'deprecated', 'removed'],
+                'ui': ['ui', 'ux', 'style', 'styles', 'css', 'scss', 'less', 'design', 'theme', 'dark mode', 'responsive', 'layout', 'asset', 'font', 'color', 'margin', 'padding', 'border', 'flex', 'grid', 'animation', 'component', 'view', 'modal', 'button', 'input', 'avatar', 'frontend'],
+                'performance': ['perf', 'performance', 'speed', 'fast', 'slow', 'optimize', 'optimization', 'memory', 'leak', 'compress', 'minify', 'bundle', 'lazy', 'load', 'render', 'repaint', 'throughput', 'latency', 'benchmark', 'scale', 'scaling'],
+                'security': ['sec', 'security', 'secure', 'insecure', 'vuln', 'vulnerability', 'cve', 'auth', 'authorize', 'token', 'secret', 'password', 'encrypt', 'decrypt', 'hash', 'salt', 'jwt', 'oauth', 'login', 'logout', 'permission', 'role', 'xss', 'csrf', 'exploit', 'audit', 'firewall', 'sanitization', 'cors'],
+                'refactor': ['refactor', 'clean', 'cleanup', 'structure', 'reorganize', 'simplify', 'format', 'lint', 'prettier', 'eslint', 'dead code', 'unused', 'modernize', 'dry', 'rename', 'move', 'extract', 'rewrite'],
+                'test': ['test', 'tests', 'testing', 'spec', 'specs', 'jest', 'mocha', 'cypress', 'e2e', 'unit', 'coverage', 'integration', 'assert', 'mock', 'spy', 'stub', 'snapshot', 'selenium', 'playwright', 'vitest', 'qa'],
+                'ci': ['ci', 'cd', 'workflow', 'pipeline', 'action', 'actions', 'deploy', 'release', 'bot', 'autobot', 'label', 'labeling', 'milestone', 'linking', 'runner', 'jenkins', 'circleci', 'travis', 'aws', 'gcp', 'azure', 'docker', 'k8s', 'kubernetes', 'container', 'image', 'registry', 'script', 'bash', 'shell', 'yaml', 'yml'],
+                'dependencies': ['deps', 'dependency', 'dependencies', 'bump', 'upgrade', 'downgrade', 'npm', 'yarn', 'pnpm', 'pip', 'gradle', 'maven', 'cargo', 'gem', 'go.mod', 'package', 'lockfile', 'vendor', 'requirements'],
+                'database': ['db', 'database', 'sql', 'mysql', 'postgres', 'mongo', 'schema', 'migration', 'query', 'model', 'entity', 'table', 'column', 'index', 'seed', 'redis', 'cache', 'storage', 'data', 'relation', 'join'],
+                'build': ['build', 'compile', 'compiler', 'webpack', 'vite', 'rollup', 'babel', 'tsc', 'typescript', 'config', 'configuration', 'env', 'environment', 'makefile'],
+                'accessibility': ['a11y', 'access', 'accessibility', 'aria', 'screen reader', 'focus', 'tabindex', 'contrast', 'alt text', 'wcag', 'keyboard'],
+                'localization': ['i18n', 'l10n', 'intl', 'international', 'locale', 'translation', 'translate', 'language', 'messages', 'strings']
               };
 
-              for (const [label, keywords] of Object.entries(patterns)) {
-                const regex = new RegExp(`\\b(${keywords.join('|')})\\b`, 'i');
-                if (title.match(regex)) {
-                  labelsToAdd.push(label);
+              const combinations = [
+                { terms: ['api', 'change'], labels: ['breaking-change'] },
+                { terms: ['drop', 'support'], labels: ['breaking-change'] },
+                { terms: ['memory', 'leak'], labels: ['performance', 'bug'] },
+                { terms: ['slow', 'query'], labels: ['performance', 'database'] },
+                { terms: ['load', 'time'], labels: ['performance'] },
+                { terms: ['docker', 'file'], labels: ['ci'] },
+                { terms: ['unit', 'test'], labels: ['test'] },
+                { terms: ['integration', 'test'], labels: ['test'] },
+                { terms: ['end', 'to', 'end'], labels: ['test'] },
+                { terms: ['react', 'component'], labels: ['ui'] },
+                { terms: ['vue', 'component'], labels: ['ui'] },
+                { terms: ['security', 'fix'], labels: ['security', 'bug'] },
+                { terms: ['auth', 'error'], labels: ['security', 'bug'] },
+                { terms: ['login', 'fail'], labels: ['security', 'bug'] }
+              ];
+
+              for (const combo of combinations) {
+                if (combo.terms.every(term => text.includes(term))) {
+                  combo.labels.forEach(l => detectedLabels.add(l));
                 }
               }
 
-              if (labelsToAdd.length > 0) {
-                for (const label of labelsToAdd) {
+              for (const [label, keywords] of Object.entries(dictionaries)) {
+                const regex = new RegExp(`\\b(${keywords.join('|')})\\b`, 'i');
+                if (text.match(regex)) {
+                  detectedLabels.add(label);
+                }
+              }
+
+              const labelsArray = Array.from(detectedLabels);
+              if (labelsArray.length > 0) {
+                for (const label of labelsArray) {
                   await ensureLabelExists(label);
                 }
                 await github.rest.issues.addLabels({
-                  owner, repo, issue_number: issueNumber, labels: labelsToAdd
+                  owner, repo, issue_number: issueNumber, labels: labelsArray
                 });
               }
             }
@@ -128,7 +162,7 @@ jobs:
 
             if (['opened', 'synchronize', 'reopened'].includes(payload.action)) {
               
-              await applyTitleLabels();
+              await analyzeAndLabel();
 
               const freshIssue = await github.rest.issues.get({
                 owner, repo, issue_number: issueNumber
