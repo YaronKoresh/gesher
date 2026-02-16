@@ -83,14 +83,14 @@ def main():
 
     # Server Mode
     server_p = subparsers.add_parser("server", help="Run the Remote Bridge Server")
+    server_p.add_argument("--secret", type=str, required=True, help="Auth secret")
     server_p.add_argument("--port", type=int, default=8000)
-    server_p.add_argument("--secret", type=str, help="Auth secret (auto-gen if missing)")
     server_p.add_argument("--public", action="store_true", help="Auto-start Cloudflare tunnel")
 
     # Client Mode
     client_p = subparsers.add_parser("client", help="Run the Local Connector")
-    client_p.add_argument("gateway", type=str, help="The public Bridge URL")
-    client_p.add_argument("secret", type=str, help="The Auth Secret")
+    client_p.add_argument("--gateway", type=str, required=True, help="The public Bridge URL")
+    client_p.add_argument("--secret", type=str, required=True, help="The Auth Secret")
     client_p.add_argument("--pin", type=str, required=True, help="The Gatekeeper PIN shown on the server")
     client_p.add_argument("--target", type=str, default="http://localhost:8080", help="Local service URL")
     client_p.add_argument("--dashboard-port", type=int, default=9000, help="Port for local stats dashboard")
@@ -98,12 +98,11 @@ def main():
     args = parser.parse_args()
 
     if args.mode == "server":
-        secret = args.secret or secrets.token_hex(16)
         if args.public:
             install_cloudflared()
             _, url = start_cloudflared_tunnel(args.port)
-            print(f"\n✅ GESHER LIVE\n🔗 URL: {url}\n🔑 SECRET: {secret}\n")
-        run_server(args.port, secret)
+            print(f"\n✅ GESHER LIVE\n🔗 URL: {url}\n")
+        run_server(args.port, args.secret)
     elif args.mode == "client":
         start_connector(args.gateway, args.secret, args.target, args.pin, args.dashboard_port)
 

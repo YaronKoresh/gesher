@@ -352,7 +352,7 @@ def run_server(port=8000, secret="default-secret"):
     print("\n🌉 Gesher Secure Server")
     print("--------------------------------")
     print(f"📍 Port:       {port}")
-    print(f"🛡️  PIN:        {GATEKEEPER_PIN} (For Clients)")
+    print(f"🛡️  PIN:        {GATEKEEPER_PIN}")
     print("📊 Dashboard:  Run 'gesher client' to view local stats.")
     print("--------------------------------\n")
 

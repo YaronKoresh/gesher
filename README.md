@@ -53,10 +53,9 @@ gesher server --port 8000 --secret "your-long-secret-key"
 🌉 Gesher Secure Server
 --------------------------------
 📍 Port:       8000
-🛡️  PIN:        7A9F2B (For Clients)
+🛡️  PIN:        7A9F2B
 📊 Dashboard:  Run 'gesher client' to view local stats.
 --------------------------------
-
 ```
 
 *Note the **PIN** (`7A9F2B`). You will need this to connect your clients.*
@@ -66,10 +65,9 @@ gesher server --port 8000 --secret "your-long-secret-key"
 Run this on your local machine where your web app (e.g., `localhost:3000`) is running.
 
 ```bash
-gesher client http://<server-ip>:8000 "your-long-secret-key" \
+gesher client --gateway http://<server-ip>:8000 --secret "your-long-secret-key" \
   --pin 7A9F2B \
   --target http://localhost:3000
-
 ```
 
 ### 3. Access the Dashboard
@@ -84,16 +82,16 @@ Open your browser to `http://localhost:9000` (the default `dashboard-port`). You
 
 | Flag | Description | Default |
 | --- | --- | --- |
+| `--secret` | The shared encryption/auth secret. | *Required* |
 | `--port` | Port to listen on for public requests. | `8000` |
-| `--secret` | The shared encryption/auth secret. | *Auto-generated* |
 | `--public` | Automatically start a Cloudflare tunnel for a public URL. | `False` |
 
 ### Client Mode
 
 | Argument/Flag | Description | Default |
 | --- | --- | --- |
-| `gateway` | The URL of your remote Gesher server. | *Required* |
-| `secret` | The shared encryption/auth secret. | *Required* |
+| `--gateway` | The URL of your remote Gesher server. | *Required* |
+| `--secret` | The shared encryption/auth secret. | *Required* |
 | `--pin` | The session PIN shown on the server console. | *Required* |
 | `--target` | Your local service URL (where traffic is sent). | `http://localhost:8080` |
 | `--dashboard-port` | Port to host the local-only monitor UI. | `9000` |
