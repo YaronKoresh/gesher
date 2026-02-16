@@ -36,6 +36,8 @@ jobs:
             const MIN_RELEASE_SIZE = 3;
             const FORCE_RELEASE_TYPES = ['enhancement', 'breaking-change', 'security'];
             const IGNORE_LABELS = ['documentation', 'chore', 'test', 'ci', 'refactor', 'dependencies', 'build'];
+            const THRESHOLD = 8;
+            const BODY_MULTIPLIER = 0.5;
 
             const labelDefinitions = {
               'bug': { color: 'd73a4a', description: "Something isn't working" },
@@ -55,6 +57,118 @@ jobs:
               'localization': { color: '91d674', description: "Localization (i18n) and translation" }
             };
 
+            function calculateLabels(title, branch, body) {
+              const textTitle = `${title} ${branch}`.toLowerCase();
+              const textBody = (body || "").toLowerCase();
+
+              const dictionaries = {
+                'bug': {
+                  high: ['fix', 'hotfix', 'patch', 'crash', 'exception', 'fatal', 'broken', 'regression'],
+                  medium: ['bug', 'issue', 'error', 'fail', 'defect', 'glitch', 'incorrect'],
+                  low: ['unexpected', 'behavior', 'weird', 'problem']
+                },
+                'enhancement': {
+                  high: ['feat', 'feature', 'new', 'add', 'implement', 'introduce', 'improve', 'enhance'],
+                  medium: ['update', 'upgrade', 'better', 'support', 'expose'],
+                  low: ['tweak', 'adjust', 'allow', 'capability']
+                },
+                'ci': {
+                  high: ['autobot', 'workflow', 'pipeline', 'ci/cd', 'github actions', 'circleci', 'jenkins', 'dockerfile', 'k8s', 'kubernetes', '.github'],
+                  medium: ['deploy', 'release', 'action', 'runner', 'label', 'labeling', 'triage'],
+                  low: ['bot', 'script', 'check', 'linter', 'yaml', 'yml', 'cron', 'schedule', 'scoring']
+                },
+                'documentation': {
+                  high: ['docs', 'documentation', 'readme', 'license', 'changelog', 'javadoc', 'jsdoc'],
+                  medium: ['doc', 'wiki', 'guide', 'manual', 'reference', 'typo', 'grammar'],
+                  low: ['comment', 'edit', 'note', 'explanation']
+                },
+                'security': {
+                  high: ['cve', 'vulnerability', 'xss', 'csrf', 'exploit', 'injection', 'hacked'],
+                  medium: ['security', 'secure', 'auth', 'authorize', 'authentication', 'token', 'secret', 'password', 'encrypt'],
+                  low: ['login', 'logout', 'permission', 'role', 'access', 'safe']
+                },
+                'performance': {
+                  high: ['memory leak', 'race condition', 'deadlock', 'bundle size', 'lazy load'],
+                  medium: ['performance', 'perf', 'optimize', 'speed', 'latency', 'throughput', 'benchmark'],
+                  low: ['slow', 'fast', 'lag', 'render', 'heavy']
+                },
+                'database': {
+                  high: ['migration', 'schema', 'sql', 'postgres', 'mongo', 'mysql', 'sqlite'],
+                  medium: ['database', 'db', 'query', 'index', 'model', 'entity', 'join'],
+                  low: ['data', 'record', 'row', 'column', 'seed']
+                },
+                'ui': {
+                  high: ['css', 'scss', 'less', 'sass', 'flexbox', 'grid', 'material-ui', 'bootstrap', 'tailwind'],
+                  medium: ['ui', 'ux', 'style', 'design', 'theme', 'dark mode', 'layout', 'component'],
+                  low: ['color', 'font', 'margin', 'padding', 'width', 'height', 'align', 'view']
+                },
+                'dependencies': {
+                  high: ['renovate', 'dependabot', 'package.json', 'yarn.lock', 'go.mod', 'cargo.toml'],
+                  medium: ['dependency', 'deps', 'npm', 'yarn', 'pip', 'upgrade dep', 'bump'],
+                  low: ['version', 'install', 'package', 'library']
+                },
+                'breaking-change': {
+                  high: ['breaking change', 'breaking', 'major', 'rewrite', 'overhaul', 'migration'],
+                  medium: ['incompatible', 'deprecate', 'deprecated', 'removed', 'drop support'],
+                  low: ['change api', 'api change']
+                },
+                'refactor': {
+                  high: ['refactor', 'rewrite', 'restructure'],
+                  medium: ['clean', 'cleanup', 'simplify', 'format', 'lint', 'prettier', 'eslint'],
+                  low: ['dead code', 'unused', 'rename', 'move', 'extract']
+                },
+                'test': {
+                  high: ['test', 'tests', 'testing', 'spec', 'specs', 'jest', 'mocha', 'cypress'],
+                  medium: ['e2e', 'unit', 'coverage', 'integration', 'assert'],
+                  low: ['mock', 'spy', 'stub', 'snapshot']
+                },
+                'build': {
+                  high: ['webpack', 'vite', 'rollup', 'babel', 'tsc', 'typescript'],
+                  medium: ['build', 'compile', 'compiler', 'config', 'configuration'],
+                  low: ['env', 'environment', 'makefile']
+                },
+                'accessibility': {
+                  high: ['a11y', 'accessibility', 'wcag', 'aria'],
+                  medium: ['screen reader', 'focus', 'tabindex', 'contrast', 'alt text'],
+                  low: ['keyboard', 'navigation']
+                },
+                'localization': {
+                  high: ['i18n', 'l10n', 'intl', 'international'],
+                  medium: ['locale', 'translation', 'translate', 'language'],
+                  low: ['messages', 'strings']
+                }
+              };
+
+              const confidentLabels = [];
+
+              for (const [label, tiers] of Object.entries(dictionaries)) {
+                let score = 0;
+
+                const calculateTierScore = (keywords, points) => {
+                  let tierScore = 0;
+                  const safeKeywords = keywords.map(k => k.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
+                  const regex = new RegExp(`\\b(${safeKeywords.join('|')})\\b`, 'gi');
+                  
+                  const titleMatches = (textTitle.match(regex) || []).length;
+                  tierScore += titleMatches * points;
+                  
+                  const bodyMatches = (textBody.match(regex) || []).length;
+                  tierScore += bodyMatches * points * BODY_MULTIPLIER;
+                  return tierScore;
+                };
+
+                score += calculateTierScore(tiers.high, 10);
+                score += calculateTierScore(tiers.medium, 5);
+                score += calculateTierScore(tiers.low, 2);
+
+                if (score >= THRESHOLD) {
+                  confidentLabels.push(label);
+                }
+              }
+
+              return confidentLabels;
+            }
+
             async function ensureLabelExists(name) {
               try {
                 await github.rest.issues.getLabel({ owner, repo, name });
@@ -65,73 +179,6 @@ jobs:
                     owner, repo, name, color: def.color, description: def.description
                   });
                 }
-              }
-            }
-
-            async function analyzeAndLabel() {
-              const title = payload.pull_request?.title || payload.issue?.title || "";
-              const branch = payload.pull_request?.head?.ref || "";
-              const body = payload.pull_request?.body || payload.issue?.body || "";
-              
-              const text = `${title} ${branch} ${body}`.toLowerCase();
-              const detectedLabels = new Set();
-
-              const dictionaries = {
-                'bug': ['fix', 'fixed', 'fixing', 'bug', 'bugs', 'hotfix', 'patch', 'issue', 'issues', 'error', 'errors', 'defect', 'crash', 'crashes', 'fail', 'fails', 'broken', 'glitch', 'exception', 'null', 'undefined', 'infinite', 'regression', '404', '500'],
-                'enhancement': ['feat', 'feature', 'features', 'add', 'added', 'adding', 'new', 'improve', 'improved', 'improving', 'implement', 'expose', 'support', 'introduce', 'create', 'ability', 'capability', 'provider', 'service', 'module', 'user story'],
-                'documentation': ['docs', 'doc', 'document', 'documentation', 'readme', 'license', 'typo', 'typos', 'grammar', 'copy', 'edit', 'editor', 'wiki', 'changelog', 'guide', 'manual', 'reference', 'javadoc', 'jsdoc', 'comment', 'comments'],
-                'breaking-change': ['breaking', 'major', 'rewrite', 'overhaul', 'migration', 'incompatible', 'deprecate', 'deprecated', 'removed'],
-                'ui': ['ui', 'ux', 'style', 'styles', 'css', 'scss', 'less', 'design', 'theme', 'dark mode', 'responsive', 'layout', 'asset', 'font', 'color', 'margin', 'padding', 'border', 'flex', 'grid', 'animation', 'component', 'view', 'modal', 'button', 'input', 'avatar', 'frontend'],
-                'performance': ['perf', 'performance', 'speed', 'fast', 'slow', 'optimize', 'optimization', 'memory', 'leak', 'compress', 'minify', 'bundle', 'lazy', 'load', 'render', 'repaint', 'throughput', 'latency', 'benchmark', 'scale', 'scaling'],
-                'security': ['sec', 'security', 'secure', 'insecure', 'vuln', 'vulnerability', 'cve', 'auth', 'authorize', 'token', 'secret', 'password', 'encrypt', 'decrypt', 'hash', 'salt', 'jwt', 'oauth', 'login', 'logout', 'permission', 'role', 'xss', 'csrf', 'exploit', 'audit', 'firewall', 'sanitization', 'cors'],
-                'refactor': ['refactor', 'clean', 'cleanup', 'structure', 'reorganize', 'simplify', 'format', 'lint', 'prettier', 'eslint', 'dead code', 'unused', 'modernize', 'dry', 'rename', 'move', 'extract', 'rewrite'],
-                'test': ['test', 'tests', 'testing', 'spec', 'specs', 'jest', 'mocha', 'cypress', 'e2e', 'unit', 'coverage', 'integration', 'assert', 'mock', 'spy', 'stub', 'snapshot', 'selenium', 'playwright', 'vitest', 'qa'],
-                'ci': ['ci', 'cd', 'workflow', 'pipeline', 'action', 'actions', 'deploy', 'release', 'bot', 'autobot', 'label', 'labeling', 'milestone', 'linking', 'runner', 'jenkins', 'circleci', 'travis', 'aws', 'gcp', 'azure', 'docker', 'k8s', 'kubernetes', 'container', 'image', 'registry', 'script', 'bash', 'shell', 'yaml', 'yml'],
-                'dependencies': ['deps', 'dependency', 'dependencies', 'bump', 'upgrade', 'downgrade', 'npm', 'yarn', 'pnpm', 'pip', 'gradle', 'maven', 'cargo', 'gem', 'go.mod', 'package', 'lockfile', 'vendor', 'requirements'],
-                'database': ['db', 'database', 'sql', 'mysql', 'postgres', 'mongo', 'schema', 'migration', 'query', 'model', 'entity', 'table', 'column', 'index', 'seed', 'redis', 'cache', 'storage', 'data', 'relation', 'join'],
-                'build': ['build', 'compile', 'compiler', 'webpack', 'vite', 'rollup', 'babel', 'tsc', 'typescript', 'config', 'configuration', 'env', 'environment', 'makefile'],
-                'accessibility': ['a11y', 'access', 'accessibility', 'aria', 'screen reader', 'focus', 'tabindex', 'contrast', 'alt text', 'wcag', 'keyboard'],
-                'localization': ['i18n', 'l10n', 'intl', 'international', 'locale', 'translation', 'translate', 'language', 'messages', 'strings']
-              };
-
-              const combinations = [
-                { terms: ['api', 'change'], labels: ['breaking-change'] },
-                { terms: ['drop', 'support'], labels: ['breaking-change'] },
-                { terms: ['memory', 'leak'], labels: ['performance', 'bug'] },
-                { terms: ['slow', 'query'], labels: ['performance', 'database'] },
-                { terms: ['load', 'time'], labels: ['performance'] },
-                { terms: ['docker', 'file'], labels: ['ci'] },
-                { terms: ['unit', 'test'], labels: ['test'] },
-                { terms: ['integration', 'test'], labels: ['test'] },
-                { terms: ['end', 'to', 'end'], labels: ['test'] },
-                { terms: ['react', 'component'], labels: ['ui'] },
-                { terms: ['vue', 'component'], labels: ['ui'] },
-                { terms: ['security', 'fix'], labels: ['security', 'bug'] },
-                { terms: ['auth', 'error'], labels: ['security', 'bug'] },
-                { terms: ['login', 'fail'], labels: ['security', 'bug'] }
-              ];
-
-              for (const combo of combinations) {
-                if (combo.terms.every(term => text.includes(term))) {
-                  combo.labels.forEach(l => detectedLabels.add(l));
-                }
-              }
-
-              for (const [label, keywords] of Object.entries(dictionaries)) {
-                const regex = new RegExp(`\\b(${keywords.join('|')})\\b`, 'i');
-                if (text.match(regex)) {
-                  detectedLabels.add(label);
-                }
-              }
-
-              const labelsArray = Array.from(detectedLabels);
-              if (labelsArray.length > 0) {
-                for (const label of labelsArray) {
-                  await ensureLabelExists(label);
-                }
-                await github.rest.issues.addLabels({
-                  owner, repo, issue_number: issueNumber, labels: labelsArray
-                });
               }
             }
 
@@ -162,7 +209,20 @@ jobs:
 
             if (['opened', 'synchronize', 'reopened'].includes(payload.action)) {
               
-              await analyzeAndLabel();
+              const title = payload.pull_request?.title || payload.issue?.title || "";
+              const branch = payload.pull_request?.head?.ref || "";
+              const body = payload.pull_request?.body || payload.issue?.body || "";
+
+              const labelsToAdd = calculateLabels(title, branch, body);
+
+              if (labelsToAdd.length > 0) {
+                for (const label of labelsToAdd) {
+                  await ensureLabelExists(label);
+                }
+                await github.rest.issues.addLabels({
+                  owner, repo, issue_number: issueNumber, labels: labelsToAdd
+                });
+              }
 
               const freshIssue = await github.rest.issues.get({
                 owner, repo, issue_number: issueNumber
