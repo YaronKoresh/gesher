@@ -16,6 +16,6 @@ jobs:
     steps:
       - uses: actions/first-interaction@v3
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          issue-message: "👋 Hi there! Thanks for opening your first issue. We will look into it soon."
-          pr-message: "🎉 Congrats on your first Pull Request! Please make sure you have run `ruff check . && ruff format` before submitting."
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          issue_message: "👋 Hi there! Thanks for opening your first issue. We will look into it soon."
+          pr_message: "🎉 Congrats on your first Pull Request! Please make sure you have run `ruff check . && ruff format` before submitting."
