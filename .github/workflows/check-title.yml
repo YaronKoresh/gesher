@@ -27,7 +27,7 @@ jobs:
               \`${allowedTypes.join(', ')}\`
 
               **Example format:**
-              > \`feat(ui): add dark mode support\`
+              > \`feat: add dark mode support\`
 
               Please update the title to pass this check.
               `;
