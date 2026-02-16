@@ -36,8 +36,8 @@ jobs:
             const MIN_RELEASE_SIZE = 3;
             const FORCE_RELEASE_TYPES = ['enhancement', 'breaking-change', 'security'];
             const IGNORE_LABELS = ['documentation', 'chore', 'test', 'ci', 'refactor', 'dependencies', 'build'];
-            const THRESHOLD = 10;
-            const BODY_MULTIPLIER = 0.25;
+            const THRESHOLD = 8;
+            const BODY_MULTIPLIER = 0.5;
 
             const labelDefinitions = {
               'bug': { color: 'd73a4a', description: "Something isn't working" },
@@ -68,14 +68,14 @@ jobs:
                   low: ['unexpected', 'behavior', 'weird', 'problem']
                 },
                 'enhancement': {
-                  high: ['feat', 'feature', 'new', 'add', 'implement', 'introduce'],
-                  medium: ['improve', 'enhance', 'update', 'upgrade', 'better', 'support', 'expose'],
+                  high: ['feat', 'feature', 'new', 'add', 'implement', 'introduce', 'improve', 'enhance'],
+                  medium: ['update', 'upgrade', 'better', 'support', 'expose'],
                   low: ['tweak', 'adjust', 'allow', 'capability']
                 },
                 'ci': {
-                  high: ['github actions', 'circleci', 'jenkins', 'dockerfile', 'k8s', 'kubernetes', 'pipeline.yml'],
-                  medium: ['ci/cd', 'workflow', 'pipeline', 'deploy', 'release', 'action', 'runner'],
-                  low: ['autobot', 'bot', 'script', 'check', 'linter', 'yaml', 'yml', 'cron', 'schedule']
+                  high: ['autobot', 'workflow', 'pipeline', 'ci/cd', 'github actions', 'circleci', 'jenkins', 'dockerfile', 'k8s', 'kubernetes', '.github'],
+                  medium: ['deploy', 'release', 'action', 'runner', 'label', 'labeling', 'triage'],
+                  low: ['bot', 'script', 'check', 'linter', 'yaml', 'yml', 'cron', 'schedule', 'scoring']
                 },
                 'documentation': {
                   high: ['docs', 'documentation', 'readme', 'license', 'changelog', 'javadoc', 'jsdoc'],
@@ -146,9 +146,12 @@ jobs:
 
                 const calculateTierScore = (keywords, points) => {
                   let tierScore = 0;
-                  const regex = new RegExp(`\\b(${keywords.join('|')})\\b`, 'gi');
+                  const safeKeywords = keywords.map(k => k.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
+                  const regex = new RegExp(`\\b(${safeKeywords.join('|')})\\b`, 'gi');
+                  
                   const titleMatches = (textTitle.match(regex) || []).length;
                   tierScore += titleMatches * points;
+                  
                   const bodyMatches = (textBody.match(regex) || []).length;
                   tierScore += bodyMatches * points * BODY_MULTIPLIER;
                   return tierScore;
