@@ -1,11 +1,11 @@
 bug:
-  - head-branch: ['^fix/', '^bug', '^bugfix', '^hotfix', '^patch']
+  - head-branch: ['^fix', '^bug', '^hotfix', '^patch']
 
 enhancement:
-  - head-branch: ['^feat/', '^feature', '^add', '^new']
+  - head-branch: ['^feat', '^add']
 
 documentation:
-  - head-branch: ['^docs', '^document', '^doc/']
+  - head-branch: ['^doc']
   - changed-files:
     - any-glob-to-any-file:
       - '**/*.md'
