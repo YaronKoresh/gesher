@@ -83,10 +83,30 @@ dev = "uvicorn gesher.server:app --reload"
 lint = "ruff check . --fix"
 format = "ruff format ."
 test = "pytest tests/"
-check = ["format", "lint", "test"]
+compile = { cmd = "py -m compileall -q ." }
+clean = { cmd = '''py -Bc "
+import pathlib, shutil;
+targets = {
+        'directories': {
+            '__pycache__', '.pytest_cache', '.ruff_cache', '.mypy_cache',
+            '.tox', '.nox', '.cache', '.ipynb_checkpoints', 'htmlcov',
+            'build', 'dist', '.eggs', '*.egg-info', '.coverage.reports'
+        },
+        'files': {
+            '.coverage', '.coverage.*', '.sqlite', 'nosetests.xml',
+            'coverage.xml', '*.pyc', '*.pyo', '*.pyd', '.DS_Store'
+        }
+};
+for p in pathlib.Path('.').rglob('*'):
+        if p.name in targets['directories'] or any(p.match(pat) for pat in targets['directories']):
+            if p.is_dir(): shutil.rmtree(p, ignore_errors=True)
+        elif p.name in targets['files'] or any(p.match(pat) for pat in targets['files']):
+            if p.is_file(): p.unlink(missing_ok=True)
+"''' }
+check = ["compile", "format", "lint", "test", "clean"]
 
 # Build Pipeline
-build = { cmd = "python -m build" }
+build = { cmd = "py -m build" }
 
 # Setup Task
 hook = { cmd = "pre-commit install" }
