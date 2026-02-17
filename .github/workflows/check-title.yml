@@ -16,7 +16,7 @@ jobs:
         with:
           script: |
             const title = context.payload.pull_request.title.toLowerCase();
-            
+
             // Exact same keywords as Autobot to ensure consistency
             const patterns = {
               'Bug': ['fix', 'fixed', 'fixing', 'bug', 'bugs', 'hotfix', 'patch', 'issue', 'issues', 'error', 'errors', 'defect', 'crash', 'crashes', 'fail', 'fails', 'broken'],
@@ -38,7 +38,7 @@ jobs:
 
             if (!regex.test(title)) {
               const categoryList = Object.keys(patterns).map(cat => `* **${cat}**`).join('\n');
-              
+
               const errMsg = `
               ### ⚠️ Title is too vague for Autobot
               Your PR title **"${context.payload.pull_request.title}"** does not contain any keywords that trigger automation.
@@ -48,7 +48,7 @@ jobs:
 
               *Example: "Optimized database queries" (Perf/DB) or "Fixed login crash" (Bug)*
               `;
-              
+
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,

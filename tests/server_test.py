@@ -22,7 +22,9 @@ class TestServer(unittest.TestCase):
         server.AUTH_FAILURES.clear()
 
     def create_mock_handler(self):
-        handler = server.BridgeRequestHandler.__new__(server.BridgeRequestHandler)
+        handler = server.BridgeRequestHandler.__new__(
+            server.BridgeRequestHandler
+        )
         handler.request = MagicMock()
         handler.client_address = ("127.0.0.1", 5000)
         handler.server = MagicMock()
@@ -91,7 +93,10 @@ class TestServer(unittest.TestCase):
 
         # Register a client
         client_queue = queue.Queue()
-        server.CLIENTS["test-client"] = {"queue": client_queue, "address": ("127.0.0.1", 5000)}
+        server.CLIENTS["test-client"] = {
+            "queue": client_queue,
+            "address": ("127.0.0.1", 5000),
+        }
 
         with patch("threading.Event.wait", return_value=False):
             handler.handle_public_request()
@@ -109,7 +114,10 @@ class TestServer(unittest.TestCase):
 
         # Register a client
         client_queue = queue.Queue()
-        server.CLIENTS["test-client"] = {"queue": client_queue, "address": ("127.0.0.1", 5000)}
+        server.CLIENTS["test-client"] = {
+            "queue": client_queue,
+            "address": ("127.0.0.1", 5000),
+        }
 
         def populate_response(*args, **kwargs):
             req_id = list(server.PENDING_RESPONSES.keys())[0]

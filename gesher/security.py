@@ -22,15 +22,21 @@ class SecurityLayer:
         try:
             return self.fernet.decrypt(token.encode()).decode()
         except Exception as exc:
-            raise ValueError("Decryption Failed: Invalid Key or Corrupted Data") from exc
+            raise ValueError(
+                "Decryption Failed: Invalid Key or Corrupted Data"
+            ) from exc
 
     def get_auth_header(self) -> str:
         """Generates a time-based HMAC signature for the Authorization header."""
         timestamp = str(int(time.time()))
-        signature = hmac.new(self.secret.encode(), timestamp.encode(), hashlib.sha256).hexdigest()
+        signature = hmac.new(
+            self.secret.encode(), timestamp.encode(), hashlib.sha256
+        ).hexdigest()
         return f"{timestamp}:{signature}"
 
-    def verify_signature(self, auth_header: str, window_seconds: int = 30) -> bool:
+    def verify_signature(
+        self, auth_header: str, window_seconds: int = 30
+    ) -> bool:
         """
         Verifies the time-based HMAC signature.
         Returns (True, signature) if valid, (False, None) if invalid.
@@ -48,7 +54,9 @@ class SecurityLayer:
                 return False, None
 
             # 2. Verify Cryptographic Match
-            expected_sig = hmac.new(self.secret.encode(), timestamp_str.encode(), hashlib.sha256).hexdigest()
+            expected_sig = hmac.new(
+                self.secret.encode(), timestamp_str.encode(), hashlib.sha256
+            ).hexdigest()
 
             is_valid = hmac.compare_digest(expected_sig, signature)
             return is_valid, signature

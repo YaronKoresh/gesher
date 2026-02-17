@@ -148,10 +148,10 @@ jobs:
                   let tierScore = 0;
                   const safeKeywords = keywords.map(k => k.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
                   const regex = new RegExp(`\\b(${safeKeywords.join('|')})\\b`, 'gi');
-                  
+
                   const titleMatches = (textTitle.match(regex) || []).length;
                   tierScore += titleMatches * points;
-                  
+
                   const bodyMatches = (textBody.match(regex) || []).length;
                   tierScore += bodyMatches * points * BODY_MULTIPLIER;
                   return tierScore;
@@ -208,7 +208,7 @@ jobs:
             }
 
             if (['opened', 'synchronize', 'reopened'].includes(payload.action)) {
-              
+
               const title = payload.pull_request?.title || payload.issue?.title || "";
               const branch = payload.pull_request?.head?.ref || "";
               const body = payload.pull_request?.body || payload.issue?.body || "";
@@ -228,17 +228,17 @@ jobs:
                 owner, repo, issue_number: issueNumber
               });
               const currentLabelNames = freshIssue.data.labels.map(l => l.name);
-              
+
               const shouldSkipMilestone = currentLabelNames.some(l => IGNORE_LABELS.includes(l));
               const hasNoLabels = currentLabelNames.length === 0;
 
               if (shouldSkipMilestone || hasNoLabels) {
-                return; 
+                return;
               }
 
               const milestone = await getOrCreateMilestone();
               const currentMilestone = payload.issue?.milestone || payload.pull_request?.milestone;
-              
+
               if (!currentMilestone) {
                 await github.rest.issues.update({
                   owner, repo, issue_number: issueNumber, milestone: milestone.number
@@ -257,7 +257,7 @@ jobs:
                   owner, repo, issue_number: issueNumber
                 });
                 const alreadyAlerted = comments.data.some(c => c.body.includes("MAJOR RELEASE ALERT"));
-                
+
                 if (!alreadyAlerted) {
                   await github.rest.issues.createComment({
                     owner, repo, issue_number: issueNumber,
@@ -276,7 +276,7 @@ jobs:
                      newTitle = `v${major}.${minor}.${patch}`;
                   }
               } else if (hasFeature) {
-                  if (patch > 0 || minor === rawParts[1]) { 
+                  if (patch > 0 || minor === rawParts[1]) {
                      if (rawParts[2] !== 0) {
                         minor++; patch = 0;
                         newTitle = `v${major}.${minor}.${patch}`;
@@ -293,7 +293,7 @@ jobs:
 
             if (payload.action === 'closed') {
               const mData = payload.issue?.milestone || payload.pull_request?.milestone;
-              
+
               if (!mData) return;
 
               const freshMilestone = await github.rest.issues.getMilestone({
@@ -303,13 +303,13 @@ jobs:
               if (freshMilestone.data.open_issues === 0 &&
                   freshMilestone.data.state === 'open' &&
                   freshMilestone.data.closed_issues > 0) {
-                 
+
                  const closedItems = await github.paginate(github.rest.issues.listForRepo, {
                     owner, repo, milestone: freshMilestone.data.number, state: 'closed'
                  });
 
                  const hasBreaking = closedItems.some(i => i.labels.some(l => l.name === 'breaking-change'));
-                 const hasForcedType = closedItems.some(i => 
+                 const hasForcedType = closedItems.some(i =>
                     i.labels.some(l => FORCE_RELEASE_TYPES.includes(l.name))
                  );
 
@@ -324,11 +324,11 @@ jobs:
                  if (latestRelease && latestRelease.draft) {
                     const v1 = targetVersion.replace('v', '').split('.').map(Number);
                     const v2 = latestRelease.tag_name.replace('v', '').split('.').map(Number);
-                    
-                    const isV2Larger = v2[0] > v1[0] || 
-                                      (v2[0] === v1[0] && v2[1] > v1[1]) || 
+
+                    const isV2Larger = v2[0] > v1[0] ||
+                                      (v2[0] === v1[0] && v2[1] > v1[1]) ||
                                       (v2[0] === v1[0] && v2[1] === v1[1] && v2[2] > v1[2]);
-                    
+
                     if (isV2Larger) targetVersion = latestRelease.tag_name;
 
                     await github.rest.repos.deleteRelease({ owner, repo, release_id: latestRelease.id });
@@ -342,7 +342,7 @@ jobs:
                  });
 
                  await github.rest.repos.createRelease({
-                   owner, repo, tag_name: targetVersion, name: targetVersion, 
+                   owner, repo, tag_name: targetVersion, name: targetVersion,
                    generate_release_notes: true,
                    draft: true
                  });

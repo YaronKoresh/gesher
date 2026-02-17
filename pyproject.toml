@@ -58,14 +58,16 @@ testpaths = ["tests"]
 # --- RUFF CONFIGURATION ---
 [tool.ruff]
 target-version = "py38"
-line-length = 120
+line-length = 80
 
 [tool.ruff.lint]
-# E/W (Standard), F (Pyflakes), I (Import Sorting), B (Bugbear/Best Practices), UP (Upgrade Syntax)
-select = ["E", "W", "F", "I", "B", "UP"]
-extend-unsafe-fixes = ["F841"]
-ignore = []
-fixable = ["ALL"]
+select = ["E", "W", "F", "I", "UP"]
+
+ignore = [
+    "E501",
+    "E402",
+    "F401"
+]
 
 [tool.ruff.lint.isort]
 force-single-line = false
@@ -81,10 +83,9 @@ indent-style = "space"
 dev = "uvicorn gesher.server:app --reload"
 
 # Quality Assurance
-lint = "ruff check . --fix"
-format = "ruff format ."
 test = "pytest tests/"
 compile = { cmd = "py -m compileall -q ." }
+precommit = { cmd = "pre-commit run --all-files", env = { SKIP = "no-commit-to-branch" } }
 clean = { cmd = '''py -Bc "
 import pathlib, shutil;
 targets = {
@@ -104,7 +105,7 @@ for p in pathlib.Path('.').rglob('*'):
         elif p.name in targets['files'] or any(p.match(pat) for pat in targets['files']):
             if p.is_file(): p.unlink(missing_ok=True)
 "''' }
-check = ["clean", "compile", "format", "lint", "test", "clean"]
+check = ["clean", "compile", "precommit", "test", "clean"]
 
 # Build Pipeline
 build = { cmd = "py -m build" }

@@ -52,7 +52,7 @@ jobs:
 
             if (prKeywords.length > 0) {
               const query = `repo:${owner}/${repo} state:open ${prKeywords.slice(0, 4).join(' ')}`;
-              
+
               try {
                 const issues = await github.rest.search.issuesAndPullRequests({
                   q: `${query} is:issue`,
@@ -63,7 +63,7 @@ jobs:
                 issues.data.items.forEach(issue => {
                   const issueWords = tokenizer(issue.title.toLowerCase());
                   const intersection = prKeywords.filter(w => issueWords.includes(w));
-                  
+
                   const score = intersection.length;
                   const isVeryRelevant = score >= 2 || (prKeywords.length < 3 && score >= 1);
 
