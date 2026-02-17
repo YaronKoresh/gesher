@@ -84,9 +84,9 @@ dev = "uvicorn gesher.server:app --reload"
 
 # Quality Assurance
 test = "pytest tests/"
-compile = { cmd = "py -m compileall -q ." }
+compile = { cmd = "python -m compileall -q ." }
 precommit = { cmd = "pre-commit run --all-files", env = { SKIP = "no-commit-to-branch" } }
-clean = { cmd = '''py -Bc "
+clean = { cmd = '''python -Bc "
 import pathlib, shutil;
 targets = {
         'directories': {
@@ -108,7 +108,7 @@ for p in pathlib.Path('.').rglob('*'):
 check = ["clean", "compile", "precommit", "test", "clean"]
 
 # Build Pipeline
-build = { cmd = "py -m build" }
+build = { cmd = "python -m build" }
 
 # Setup Task
 hook = { cmd = "pre-commit install" }

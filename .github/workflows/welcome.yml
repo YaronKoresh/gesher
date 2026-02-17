@@ -18,4 +18,4 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           issue_message: "👋 Hi there! Thanks for opening an issue. We will look into it soon."
-          pr_message: "🎉 Congrats on opening an Pull Request! Please make sure you have run `ruff check . && ruff format` before submitting."
+          pr_message: "🎉 Congrats for opening a Pull Request! Please make sure you have run `ruff check . && ruff format` before submitting."
