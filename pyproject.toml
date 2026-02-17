@@ -63,6 +63,7 @@ line-length = 120
 [tool.ruff.lint]
 # E/W (Standard), F (Pyflakes), I (Import Sorting), B (Bugbear/Best Practices), UP (Upgrade Syntax)
 select = ["E", "W", "F", "I", "B", "UP"]
+extend-unsafe-fixes = ["F841"]
 ignore = []
 fixable = ["ALL"]
 
@@ -103,7 +104,7 @@ for p in pathlib.Path('.').rglob('*'):
         elif p.name in targets['files'] or any(p.match(pat) for pat in targets['files']):
             if p.is_file(): p.unlink(missing_ok=True)
 "''' }
-check = ["compile", "format", "lint", "test", "clean"]
+check = ["clean", "compile", "format", "lint", "test", "clean"]
 
 # Build Pipeline
 build = { cmd = "py -m build" }
