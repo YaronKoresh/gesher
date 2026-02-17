@@ -39,7 +39,11 @@ class TestCLI(unittest.TestCase):
             cli.main()
 
         mock_start_connector.assert_called_with(
-            "http://my-gateway.com", "mykey", "http://localhost:3000", "ABC123", 9000
+            "http://my-gateway.com",
+            "mykey",
+            "http://localhost:3000",
+            "ABC123",
+            9000,
         )
 
     @patch("gesher.cli.subprocess.run")

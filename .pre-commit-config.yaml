@@ -2,9 +2,9 @@ repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.1
     hooks:
-      - id: ruff
-        args: [ --fix ]
       - id: ruff-format
+      - id: ruff-check
+        args: [ --fix, --unsafe-fixes ]
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -29,8 +29,8 @@ repos:
       - id: forbid-submodules
       - id: mixed-line-ending
         args: [ --fix=lf ]
-      - id: name-tests-test
       - id: no-commit-to-branch
+        stages: [ pre-commit ]
       - id: pretty-format-json
         args: [ --autofix ]
       - id: requirements-txt-fixer

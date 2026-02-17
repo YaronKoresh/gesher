@@ -9,7 +9,9 @@ import requests
 
 from .security import SecurityLayer
 
-logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s", datefmt="%H:%M:%S")
+logging.basicConfig(
+    level=logging.INFO, format="[%(asctime)s] %(message)s", datefmt="%H:%M:%S"
+)
 logger = logging.getLogger("SecureClient")
 
 SECURITY = None
@@ -100,7 +102,10 @@ def run_local_dashboard(port, gateway_url, pin):
                 try:
                     resp = requests.post(
                         f"{gateway_url}/_sys/sync_stats",
-                        headers={"Authorization": SECURITY.get_auth_header(), "X-Join-Code": pin},
+                        headers={
+                            "Authorization": SECURITY.get_auth_header(),
+                            "X-Join-Code": pin,
+                        },
                         timeout=5,
                     )
                     if resp.status_code == 200:
@@ -117,7 +122,9 @@ def run_local_dashboard(port, gateway_url, pin):
                 self.send_error(404)
 
     logger.info(f"📊 Local Dashboard running at http://localhost:{port}")
-    http.server.HTTPServer(("localhost", port), LocalDashHandler).serve_forever()
+    http.server.HTTPServer(
+        ("localhost", port), LocalDashHandler
+    ).serve_forever()
 
 
 def handle_task(encrypted_payload, local_target, gateway_url):
@@ -142,7 +149,9 @@ def handle_task(encrypted_payload, local_target, gateway_url):
                 method=task["method"],
                 url=f"{local_target}{task['url']}",
                 headers=task.get("headers"),
-                data=base64.b64decode(task["body"]) if task.get("body") else None,
+                data=base64.b64decode(task["body"])
+                if task.get("body")
+                else None,
                 allow_redirects=False,
             )
         except Exception as e:
@@ -173,7 +182,9 @@ def start_connector(gateway_url, secret, local_target, pin, dashboard_port):
     global SECURITY
     SECURITY = SecurityLayer(secret)
 
-    dash_thread = threading.Thread(target=run_local_dashboard, args=(dashboard_port, gateway_url, pin))
+    dash_thread = threading.Thread(
+        target=run_local_dashboard, args=(dashboard_port, gateway_url, pin)
+    )
     dash_thread.daemon = True
     dash_thread.start()
 
@@ -183,7 +194,10 @@ def start_connector(gateway_url, secret, local_target, pin, dashboard_port):
 
             with requests.post(
                 f"{gateway_url}/_connect_tunnel",
-                headers={"Authorization": SECURITY.get_auth_header(), "X-Join-Code": pin},
+                headers={
+                    "Authorization": SECURITY.get_auth_header(),
+                    "X-Join-Code": pin,
+                },
                 stream=True,
                 timeout=None,
             ) as r:
@@ -191,14 +205,20 @@ def start_connector(gateway_url, secret, local_target, pin, dashboard_port):
                     logger.critical("⛔ Gatekeeper Rejected: Invalid PIN.")
                     return
                 elif r.status_code == 403:
-                    logger.critical("⛔ Access Denied: Invalid Secret or Signature.")
+                    logger.critical(
+                        "⛔ Access Denied: Invalid Secret or Signature."
+                    )
                     return
                 elif r.status_code != 200:
-                    logger.warning(f"⚠️ Gateway Status {r.status_code}. Retrying...")
+                    logger.warning(
+                        f"⚠️ Gateway Status {r.status_code}. Retrying..."
+                    )
                     time.sleep(5)
                     continue
 
-                logger.info("✅ Secure Tunnel Established. Waiting for encrypted tasks...")
+                logger.info(
+                    "✅ Secure Tunnel Established. Waiting for encrypted tasks..."
+                )
 
                 for line in r.iter_lines():
                     if not line:
@@ -209,7 +229,12 @@ def start_connector(gateway_url, secret, local_target, pin, dashboard_port):
 
                         if encrypted_payload:
                             t = threading.Thread(
-                                target=handle_task, args=(encrypted_payload, local_target, gateway_url)
+                                target=handle_task,
+                                args=(
+                                    encrypted_payload,
+                                    local_target,
+                                    gateway_url,
+                                ),
                             )
                             t.daemon = True
                             t.start()

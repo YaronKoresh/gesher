@@ -12,7 +12,9 @@ import uuid
 
 from .security import SecurityLayer
 
-logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="[%(asctime)s] [%(levelname)s] %(message)s"
+)
 logger = logging.getLogger("BridgeServer")
 
 # --- Global State ---
@@ -40,7 +42,13 @@ MAX_AUTH_FAILURES = 5
 AUTH_LOCKOUT_DURATION = 600
 
 # --- Monitoring Stats ---
-STATS = {"start_time": time.time(), "requests_processed": 0, "bytes_tx": 0, "bytes_rx": 0, "blocked_reqs": 0}
+STATS = {
+    "start_time": time.time(),
+    "requests_processed": 0,
+    "bytes_tx": 0,
+    "bytes_rx": 0,
+    "blocked_reqs": 0,
+}
 STATS_LOCK = threading.Lock()
 
 
@@ -61,7 +69,9 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
         with IP_LOCK:
             # 1. Check Rate Limit
             timestamps = IP_REQUEST_COUNTS[client_ip]
-            IP_REQUEST_COUNTS[client_ip] = [t for t in timestamps if now - t < RATE_LIMIT_WINDOW]
+            IP_REQUEST_COUNTS[client_ip] = [
+                t for t in timestamps if now - t < RATE_LIMIT_WINDOW
+            ]
 
             if not IP_REQUEST_COUNTS[client_ip]:
                 del IP_REQUEST_COUNTS[client_ip]
@@ -157,7 +167,9 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
 
         current_time = int(time.time())
         with SIGNATURE_LOCK:
-            keys_to_delete = [k for k, t in SEEN_SIGNATURES.items() if current_time - t > 35]
+            keys_to_delete = [
+                k for k, t in SEEN_SIGNATURES.items() if current_time - t > 35
+            ]
             for k in keys_to_delete:
                 del SEEN_SIGNATURES[k]
 
@@ -195,7 +207,10 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
         logger.info(f"🛡️  Client Connected: {client_id}")
 
         with CLIENT_LOCK:
-            CLIENTS[client_id] = {"queue": client_queue, "address": self.client_address}
+            CLIENTS[client_id] = {
+                "queue": client_queue,
+                "address": self.client_address,
+            }
 
         self.broadcast_client_list()
 
@@ -308,7 +323,12 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
                 resp = PENDING_RESPONSES[req_id]["data"]
                 self.send_response(resp["status"])
                 for k, v in resp.get("headers", {}).items():
-                    if k.lower() not in ["date", "server", "content-encoding", "transfer-encoding"]:
+                    if k.lower() not in [
+                        "date",
+                        "server",
+                        "content-encoding",
+                        "transfer-encoding",
+                    ]:
                         self.send_header(k, v)
                 self.end_headers()
                 if resp.get("body"):
@@ -324,7 +344,11 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
     def broadcast_client_list(self):
         with CLIENT_LOCK:
             active_clients = list(CLIENTS.keys())
-        system_msg = {"type": "system_update", "event": "client_list", "clients": active_clients}
+        system_msg = {
+            "type": "system_update",
+            "event": "client_list",
+            "clients": active_clients,
+        }
         encrypted_msg = SECURITY.encrypt(json.dumps(system_msg))
         with CLIENT_LOCK:
             for _cid, data in CLIENTS.items():
