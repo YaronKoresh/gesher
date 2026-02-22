@@ -35,7 +35,7 @@ class TestServer(unittest.TestCase):
         handler.path = "/"
         handler.request_version = "HTTP/1.1"
         handler.requestline = "GET / HTTP/1.1"
-        # Patch HTTP response methods so they don't try to write to real sockets
+
         handler.send_response = MagicMock()
         handler.send_error = MagicMock()
         handler.send_header = MagicMock()
@@ -91,7 +91,6 @@ class TestServer(unittest.TestCase):
         handler.headers.get.return_value = "0"
         handler.headers.__iter__ = MagicMock(return_value=iter([]))
 
-        # Register a client
         client_queue = queue.Queue()
         server.CLIENTS["test-client"] = {
             "queue": client_queue,
@@ -112,7 +111,6 @@ class TestServer(unittest.TestCase):
         handler.headers.__iter__ = MagicMock(return_value=iter([]))
         handler.headers.items.return_value = []
 
-        # Register a client
         client_queue = queue.Queue()
         server.CLIENTS["test-client"] = {
             "queue": client_queue,
@@ -131,7 +129,6 @@ class TestServer(unittest.TestCase):
         with patch("threading.Event.wait", side_effect=populate_response):
             handler.handle_public_request()
 
-        # Verify a task was queued to the client
         self.assertFalse(client_queue.empty())
 
         handler.send_response.assert_called_with(200)

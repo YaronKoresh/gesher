@@ -9,7 +9,7 @@ from cryptography.fernet import Fernet
 class SecurityLayer:
     def __init__(self, secret: str):
         self.secret = secret
-        # Derive a 32-byte URL-safe base64 key from the shared secret for AES
+
         key = hashlib.sha256(secret.encode()).digest()
         self.fernet = Fernet(base64.urlsafe_b64encode(key))
 
@@ -49,11 +49,9 @@ class SecurityLayer:
             timestamp = int(timestamp_str)
             current_time = int(time.time())
 
-            # 1. Check Time Window
             if abs(current_time - timestamp) > window_seconds:
                 return False, None
 
-            # 2. Verify Cryptographic Match
             expected_sig = hmac.new(
                 self.secret.encode(), timestamp_str.encode(), hashlib.sha256
             ).hexdigest()
