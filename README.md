@@ -107,6 +107,12 @@ Open your browser to `http://localhost:9000` (the default `dashboard-port`). You
 
 ---
 
-## 📄 License
+## ⚖️ License & Usage (IMPORTANT)
 
-This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
+This project is released under the **Universal Copyleft Source License (UCSL-1.0)**. Please read the following carefully before integrating this code into your projects:
+
+* **✅ Free for Open Source, Personal & Commercial Use:** You are absolutely free to use, modify, distribute, and even monetize this software, *provided* that your project is fully open-source and complies with the UCSL-1.0 terms.
+* **⚠️ Strict Copyleft (Viral License):** If you integrate, import, link (statically or dynamically), or bundle this code into your own application, your **entire combined project** becomes a derivative work. You will be legally required to release your entire source code to the public under the exact same UCSL-1.0 terms.
+* **💼 Closed-Source / Proprietary License:** Want to use this software in a proprietary, closed-source product without being forced to open-source your own codebase? **Contact me** to arrange a separate commercial license.
+
+For the full legal terms, see the [LICENSE](./LICENSE) file.

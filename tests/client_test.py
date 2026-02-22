@@ -59,7 +59,6 @@ class TestClient(unittest.TestCase):
             encrypted_payload, "http://localhost:8080", "http://gateway"
         )
 
-        # When local service fails, no response is posted back
         mock_post.assert_not_called()
 
     @patch("gesher.client.requests.post")
@@ -76,7 +75,7 @@ class TestClient(unittest.TestCase):
 
     def test_handle_task_invalid_encrypted_payload(self):
         """handle_task should gracefully handle corrupted payloads."""
-        # Should not raise, just log the error
+
         client.handle_task(
             "invalid-encrypted-data", "http://localhost:8080", "http://gateway"
         )

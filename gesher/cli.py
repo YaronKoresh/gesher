@@ -28,7 +28,6 @@ def install_cloudflared():
     system = platform.system()
     machine = platform.machine().lower()
 
-    # Determine Architecture
     is_arm = "arm" in machine or "aarch64" in machine
 
     if system == "Linux":
@@ -93,7 +92,6 @@ def main():
     )
     subparsers = parser.add_subparsers(dest="mode", required=True)
 
-    # Server Mode
     server_p = subparsers.add_parser(
         "server", help="Run the Remote Bridge Server"
     )
@@ -105,7 +103,6 @@ def main():
         "--public", action="store_true", help="Auto-start Cloudflare tunnel"
     )
 
-    # Client Mode
     client_p = subparsers.add_parser("client", help="Run the Local Connector")
     client_p.add_argument(
         "--gateway", type=str, required=True, help="The public Bridge URL"

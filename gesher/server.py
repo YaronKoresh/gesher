@@ -17,7 +17,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("BridgeServer")
 
-# --- Global State ---
+
 GATEKEEPER_PIN = None
 SHARED_SECRET = None
 SECURITY = None
@@ -28,7 +28,7 @@ PENDING_RESPONSES = {}
 SEEN_SIGNATURES = {}
 SIGNATURE_LOCK = threading.Lock()
 
-# --- Security & DoS Constants ---
+
 MAX_CLIENTS = 50
 MAX_BODY_SIZE = 10 * 1024 * 1024
 RATE_LIMIT_WINDOW = 60
@@ -36,12 +36,12 @@ RATE_LIMIT_MAX_REQ = 100
 IP_REQUEST_COUNTS = collections.defaultdict(list)
 IP_LOCK = threading.Lock()
 
-# Brute Force Protection
+
 AUTH_FAILURES = collections.defaultdict(list)
 MAX_AUTH_FAILURES = 5
 AUTH_LOCKOUT_DURATION = 600
 
-# --- Monitoring Stats ---
+
 STATS = {
     "start_time": time.time(),
     "requests_processed": 0,
@@ -67,7 +67,6 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
         now = time.time()
 
         with IP_LOCK:
-            # 1. Check Rate Limit
             timestamps = IP_REQUEST_COUNTS[client_ip]
             IP_REQUEST_COUNTS[client_ip] = [
                 t for t in timestamps if now - t < RATE_LIMIT_WINDOW
@@ -82,7 +81,6 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
 
             IP_REQUEST_COUNTS[client_ip].append(now)
 
-            # 2. Check Brute Force Lockout
             failures = AUTH_FAILURES[client_ip]
             AUTH_FAILURES[client_ip] = [t for t in failures if now - t < 120]
 

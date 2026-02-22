@@ -31,7 +31,7 @@ class TestSecurityLayer(unittest.TestCase):
         self.assertIn(":", header)
         parts = header.split(":", 1)
         self.assertEqual(len(parts), 2)
-        # First part should be a unix timestamp
+
         int(parts[0])
 
     def test_verify_signature_valid(self):
