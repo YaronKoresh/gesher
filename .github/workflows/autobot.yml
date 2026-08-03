@@ -143,7 +143,7 @@ jobs:
       - name: AI — Generate Change Summary
         if: steps.collect.outputs.has_changes == 'true'
         id: ai-summary
-        uses: actions/ai-inference@v2
+        uses: actions/ai-inference@v3
         with:
           model: openai/gpt-4.1
           prompt-file: /tmp/summary_prompt.txt
@@ -244,7 +244,7 @@ jobs:
       - name: AI — Classify Labels
         if: steps.label-prompt.outputs.ready == 'true'
         id: ai-labels
-        uses: actions/ai-inference@v2
+        uses: actions/ai-inference@v3
         with:
           model: openai/gpt-4.1-mini
           prompt-file: /tmp/label_prompt.txt
