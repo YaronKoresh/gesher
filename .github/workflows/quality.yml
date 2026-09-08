@@ -1,0 +1,48 @@
+name: Quality
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install Dev Tools
+        run: python -m pip install -e ".[dev]"
+
+      - name: Syntax Check
+        run: poe compile
+
+      - name: Lint Check
+        run: poe lint
+
+      - name: Dead Code Check
+        run: poe dead-code
+
+      - name: Format Check
+        run: poe check-format
+
+      - name: Install PySide6 GUI Packages For Linux
+        run: sudo apt-get install -y libegl1 libgl1 libglx-mesa0 libxkbcommon-x11-0 libxcb-cursor0
+
+      - name: Run Tests
+        run: poe test
+        env:
+          GUI_ENV_CHECKED: "1"

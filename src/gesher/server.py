@@ -60,6 +60,7 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def log_request(self, code="-", size="-"):
+        _junk = [code, size]
         pass
 
     def check_rate_limit(self):

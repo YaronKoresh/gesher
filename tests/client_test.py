@@ -74,14 +74,12 @@ class TestClient(unittest.TestCase):
         mock_post.assert_called_once()
 
     def test_handle_task_invalid_encrypted_payload(self):
-        """handle_task should gracefully handle corrupted payloads."""
 
         client.handle_task(
             "invalid-encrypted-data", "http://localhost:8080", "http://gateway"
         )
 
     def test_handle_task_system_update(self):
-        """handle_task should handle system_update events without forwarding."""
         system_msg = {
             "type": "system_update",
             "event": "client_list",

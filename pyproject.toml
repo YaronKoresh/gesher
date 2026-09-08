@@ -4,17 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gesher"
-version = "1.0.0"
 description = "A secure, pure-Python HTTP tunnel to expose local services to the internet."
-readme = "README.md"
-license = {text = "UCSL-1.0"}
-license-files = ["LICENSE"]
-requires-python = ">=3.8"
+version = "1.0.0"
 authors = [
     {name = "Yaron Koresh"},
 ]
+requires-python = ">=3.8,<3.14"
 classifiers = [
-    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
@@ -24,9 +20,10 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Topic :: Software Development :: Libraries",
-    "Topic :: Utilities",
 ]
+readme = "README.md"
+license = {text = "GPL-3.0"}
+license-files = ["LICENSE"]
 keywords = ["repository", "tunneling", "networking"]
 dependencies = [
     "requests",
@@ -38,10 +35,19 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "pytest-mock",
+    "hypothesis",
+    "expecttest",
     "ruff",
     "poethepoet",
     "pre-commit",
-    "build"
+    "build",
+    "pydantic",
+    "mypy",
+    "vulture",
+    "websockets"
 ]
 
 [project.scripts]
@@ -52,8 +58,22 @@ Homepage = "https://github.com/YaronKoresh/gesher"
 Repository = "https://github.com/YaronKoresh/gesher"
 Issues = "https://github.com/YaronKoresh/gesher/issues"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/gesher"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = [
+    "tests",
+]
+pythonpath = [
+    "src",
+]
+markers = [
+    "asyncio: marks async tests",
+]
 
 # --- RUFF CONFIGURATION ---
 [tool.ruff]
@@ -61,12 +81,26 @@ target-version = "py38"
 line-length = 80
 
 [tool.ruff.lint]
-select = ["E", "W", "F", "I", "UP"]
-
+select = [
+    "E",
+    "W",
+    "F",
+    "I",
+    "UP",
+]
 ignore = [
     "E501",
     "E402",
-    "F401"
+    "E722",
+    "E741",
+    "F401",
+    "F403",
+    "F821",
+]
+
+[tool.ruff.lint.extend-per-file-ignores]
+"tests/**/*" = [
+    "E731",
 ]
 
 [tool.ruff.lint.isort]
@@ -83,68 +117,63 @@ indent-style = "space"
 dev = "uvicorn gesher.server:app --reload"
 
 # Quality Assurance
-test = "pytest tests/"
-compile = { cmd = "python -m compileall -q ." }
-pre-commit = { cmd = "pre-commit run --all-files", env = { SKIP = "no-commit-to-branch" } }
-clean = { cmd = '''python -Bc "
-import pathlib, shutil;
-targets = {
-        'directories': {
-            '__pycache__', '.pytest_cache', '.ruff_cache', '.mypy_cache',
-            '.tox', '.nox', '.cache', '.ipynb_checkpoints', 'htmlcov',
-            'build', 'dist', '.eggs', '*.egg-info', '.coverage.reports'
-        },
-        'files': {
-            '.coverage', '.coverage.*', '.sqlite', 'nosetests.xml',
-            'coverage.xml', '*.pyc', '*.pyo', '*.pyd', '.DS_Store'
-        }
-};
-for p in pathlib.Path('.').rglob('*'):
-        if p.name in targets['directories'] or any(p.match(pat) for pat in targets['directories']):
-            if p.is_dir(): shutil.rmtree(p, ignore_errors=True)
-        elif p.name in targets['files'] or any(p.match(pat) for pat in targets['files']):
-            if p.is_file(): p.unlink(missing_ok=True)
-"''' }
-strip-comments = { cmd = '''python -c "
-import tokenize
-import io
-import pathlib
+check = ["clean", "compile", "dead-code", "strip-comments", "pre-commit", "test", "clean"]
+coverage = ["_coverage-clean", "_coverage-run", "_coverage-clean"]
+test = ["test-py"]
 
-def strip_comments_and_format(file_path):
-    try:
-        with open(file_path, 'r', encoding='utf-8', newline='') as f:
-            source = f.read()
+[tool.poe.tasks.test-js]
+cmd = "node --test tests/autobot_smart_link_unified.test.cjs tests/autobot_scripts.test.cjs tests/smart_link_scripts.test.cjs tests/deterministic_scenario_lanes.test.cjs tests/autobot_adversarial.test.cjs"
 
-        tokens = tokenize.generate_tokens(io.StringIO(source).readline)
-        result = []
-        last_lineno = -1
-        last_col = 0
+[tool.poe.tasks.autobot-preview]
+cmd = "node scripts/print_autobot_regression_fixture.cjs"
 
-        for toktype, tokval, start, end, line in tokens:
-            if toktype == tokenize.COMMENT:
-                continue
+[tool.poe.tasks.autobot-random]
+cmd = "node scripts/run_autobot_scenario_lanes.cjs"
 
-            if toktype == tokenize.NL or toktype == tokenize.NEWLINE:
-                pass
+[tool.poe.tasks.test-py]
+cmd = "python -m pytest tests/"
 
-            result.append((toktype, tokval, start, end, line))
-        cleaned = tokenize.untokenize(result)
+[tool.poe.tasks._coverage-run]
+cmd = "python -m pytest -q --cov=src --cov-branch --cov-report=term-missing:skip-covered tests/"
 
-        with open(file_path, 'w', encoding='utf-8', newline='') as f:
-            f.write(cleaned)
+[tool.poe.tasks._coverage-run.env]
+COVERAGE_FILE = ".coverage.poe"
 
-        print(f'Stripped and cleaned: {file_path}')
+[tool.poe.tasks._coverage-clean]
+cmd = "python -c \"from pathlib import Path; Path('.coverage.poe').unlink(missing_ok=True); Path('.coverage').unlink(missing_ok=True)\""
 
-    except Exception as e:
-        print(f'Failed to process {file_path}: {e}')
+[tool.poe.tasks.compile]
+cmd = "python -m compileall -q ."
 
-for p in pathlib.Path('.').rglob('*.py'):
-    strip_comments_and_format(p)
-"''' }
-check = ["clean", "compile", "strip-comments", "pre-commit", "test", "clean"]
+[tool.poe.tasks.lint]
+cmd = "python -m ruff check ."
 
-# Build Pipeline
-build = { cmd = "python -m build" }
+[tool.poe.tasks.check-format]
+cmd = "python -m ruff format --check ."
 
-# Setup Task
-hook = { cmd = "pre-commit install" }
+[tool.poe.tasks.pre-commit]
+cmd = "python -m pre_commit run --all-files"
+
+[tool.poe.tasks.pre-commit.env]
+SKIP = "no-commit-to-branch"
+
+[tool.poe.tasks.clean]
+cmd = "python scripts/clean_workspace.py"
+
+[tool.poe.tasks.strip-comments]
+cmd = "python scripts/strip_comments.py"
+
+[tool.poe.tasks.build]
+cmd = "python -m build"
+
+[tool.poe.tasks.build-wheel]
+cmd = "python -m build --wheel"
+
+[tool.poe.tasks.hook]
+cmd = "python -m pre_commit install"
+
+[tool.poe.tasks.format]
+cmd = "python -m ruff format ."
+
+[tool.poe.tasks.dead-code]
+cmd = "python -m vulture src/ --min-confidence 80 --sort-by-size"

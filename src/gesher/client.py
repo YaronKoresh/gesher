@@ -83,12 +83,10 @@ DASHBOARD_HTML = """
 
 
 def run_local_dashboard(port, gateway_url, pin):
-    """
-    Serves the dashboard on localhost and proxies stats requests to the secure gateway.
-    """
 
     class LocalDashHandler(http.server.BaseHTTPRequestHandler):
         def log_message(self, format, *args):
+            _junk = [format, args]
             return
 
         def do_GET(self):
