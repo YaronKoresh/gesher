@@ -133,3 +133,40 @@ class TestServer(unittest.TestCase):
 
         handler.send_response.assert_called_with(200)
         handler.wfile.write.assert_called_with(b"Hello World")
+
+    def _public_request_with_length(self, value):
+        handler = self.create_mock_handler()
+        handler.headers.get.side_effect = lambda key, default=None: {
+            "Content-Length": value
+        }.get(key, default)
+        server.CLIENTS["test-client"] = {
+            "queue": queue.Queue(),
+            "address": ("127.0.0.1", 5000),
+        }
+        handler.handle_public_request()
+        return handler
+
+    def test_handle_public_request_non_numeric_content_length(self):
+        handler = self._public_request_with_length("abc")
+
+        handler.send_error.assert_called_with(400, "Bad Content-Length")
+        handler.rfile.read.assert_not_called()
+
+    def test_handle_public_request_negative_content_length(self):
+        handler = self._public_request_with_length("-5")
+
+        handler.send_error.assert_called_with(400, "Bad Content-Length")
+        handler.rfile.read.assert_not_called()
+
+    def test_handle_tunnel_response_negative_content_length(self):
+        handler = self.create_mock_handler()
+        auth_header = self.security.get_auth_header()
+        handler.headers.get.side_effect = lambda key, default=None: {
+            "Authorization": auth_header,
+            "Content-Length": "-1",
+        }.get(key, default)
+
+        handler.handle_tunnel_response()
+
+        handler.send_error.assert_called_with(400, "Bad Content-Length")
+        handler.rfile.read.assert_not_called()

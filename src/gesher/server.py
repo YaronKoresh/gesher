@@ -63,6 +63,20 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
         _junk = [code, size]
         pass
 
+    def read_content_length(self):
+        raw = self.headers.get("Content-Length", "0")
+        try:
+            length = int(raw)
+        except ValueError:
+            length = -1
+        if length < 0:
+            self.send_error(400, "Bad Content-Length")
+            return None
+        if length > MAX_BODY_SIZE:
+            self.send_error(413)
+            return None
+        return length
+
     def check_rate_limit(self):
         client_ip = self.client_address[0]
         now = time.time()
@@ -240,13 +254,8 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
             self.send_error(403)
             return
 
-        try:
-            length = int(self.headers.get("Content-Length", 0))
-            if length > MAX_BODY_SIZE:
-                self.send_error(413)
-                return
-        except ValueError:
-            self.send_error(400)
+        length = self.read_content_length()
+        if length is None:
             return
 
         self.track_traffic(rx=length)
@@ -291,9 +300,8 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
 
         req_id = str(uuid.uuid4())
 
-        length = int(self.headers.get("Content-Length", 0))
-        if length > MAX_BODY_SIZE:
-            self.send_error(413, "Request Too Large")
+        length = self.read_content_length()
+        if length is None:
             return
 
         self.track_traffic(rx=length)
