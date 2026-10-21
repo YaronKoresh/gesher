@@ -514,16 +514,24 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
                     base64.b64decode(resp["body"]) if resp.get("body") else b""
                 )
                 self.send_response(status)
+                is_head = self.command == "HEAD"
+                head_length = None
                 for k, v in resp.get("headers", {}).items():
                     if k.lower() not in DROPPED_RESPONSE_HEADERS:
                         self.send_header(k, v)
+                    elif is_head and k.lower() == "content-length":
+                        if v.isascii() and v.isdigit():
+                            head_length = v
                 for cookie in resp.get("set_cookies", []):
                     self.send_header("Set-Cookie", cookie)
                 has_body = status >= 200 and status not in (204, 304)
-                if has_body:
+                if has_body and is_head:
+                    if head_length is not None:
+                        self.send_header("Content-Length", head_length)
+                elif has_body:
                     self.send_header("Content-Length", str(len(data)))
                 self.end_headers()
-                if has_body and data:
+                if has_body and data and not is_head:
                     self.wfile.write(data)
                     self.track_traffic(tx=len(data))
             else:
@@ -555,6 +563,12 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
         self.handle_public_request()
 
     def do_PATCH(self):
+        self.handle_public_request()
+
+    def do_HEAD(self):
+        self.handle_public_request()
+
+    def do_OPTIONS(self):
         self.handle_public_request()
 
 
