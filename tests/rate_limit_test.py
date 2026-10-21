@@ -7,6 +7,7 @@ from gesher import server
 def handler_for(ip):
     handler = server.BridgeRequestHandler.__new__(server.BridgeRequestHandler)
     handler.client_address = (ip, 5000)
+    handler.headers = {}
     return handler
 
 

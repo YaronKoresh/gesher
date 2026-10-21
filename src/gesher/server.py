@@ -1,6 +1,7 @@
 import base64
 import collections
 import http.server
+import ipaddress
 import json
 import logging
 import queue
@@ -201,8 +202,24 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
             body += chunk
             self.rfile.readline(MAX_CHUNK_LINE)
 
+    def remote_ip(self):
+        peer = self.client_address[0]
+        try:
+            is_local = ipaddress.ip_address(peer).is_loopback
+        except ValueError:
+            is_local = False
+        if not is_local:
+            return peer
+        forwarded = self.headers.get("CF-Connecting-IP")
+        if not isinstance(forwarded, str):
+            return peer
+        try:
+            return str(ipaddress.ip_address(forwarded.strip()))
+        except ValueError:
+            return peer
+
     def check_rate_limit(self):
-        client_ip = self.client_address[0]
+        client_ip = self.remote_ip()
         now = time.time()
 
         with IP_LOCK:
@@ -237,7 +254,7 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
             return True
 
     def record_auth_failure(self):
-        client_ip = self.client_address[0]
+        client_ip = self.remote_ip()
         with IP_LOCK:
             AUTH_FAILURES[client_ip].append(time.time())
         logger.warning(f"⛔ Auth Failure from {client_ip}")
@@ -352,7 +369,7 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
         with CLIENT_LOCK:
             CLIENTS[client_id] = {
                 "queue": client_queue,
-                "address": self.client_address,
+                "address": (self.remote_ip(), self.client_address[1]),
             }
 
         self.broadcast_client_list()
