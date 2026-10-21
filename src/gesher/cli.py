@@ -123,6 +123,21 @@ def start_cloudflared_tunnel(port):
                 return proc, None
 
 
+def stop_tunnel(proc):
+    if proc is None:
+        return
+    try:
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
+    except OSError:
+        pass
+
+
 def port_number(value):
     try:
         port = int(value)
@@ -198,17 +213,21 @@ def main():
     args = parser.parse_args()
 
     if args.mode == "server":
-        if args.public:
-            install_cloudflared()
-            _, url = start_cloudflared_tunnel(args.port)
-            if url:
-                print(f"\n✅ GESHER LIVE\n🔗 URL: {url}\n")
-            else:
-                print(
-                    "\n❌ The public URL did not appear. "
-                    "See tunnel.log for the cloudflared output.\n"
-                )
-        run_server(args.port, args.secret)
+        tunnel = None
+        try:
+            if args.public:
+                install_cloudflared()
+                tunnel, url = start_cloudflared_tunnel(args.port)
+                if url:
+                    print(f"\n✅ GESHER LIVE\n🔗 URL: {url}\n")
+                else:
+                    print(
+                        "\n❌ The public URL did not appear. "
+                        "See tunnel.log for the cloudflared output.\n"
+                    )
+            run_server(args.port, args.secret)
+        finally:
+            stop_tunnel(tunnel)
     elif args.mode == "client":
         start_connector(
             args.gateway,
