@@ -190,6 +190,10 @@ def iter_stream_lines(response):
         yield bytes(pending)
 
 
+def strip_trailing_slashes(url):
+    return url.rstrip("/")
+
+
 def is_valid_task_url(url):
     if not isinstance(url, str) or not url.startswith("/"):
         return False
@@ -232,6 +236,8 @@ def post_gateway_response(
 
 
 def handle_task(encrypted_payload, local_target, gateway_url):
+    local_target = strip_trailing_slashes(local_target)
+    gateway_url = strip_trailing_slashes(gateway_url)
     try:
         try:
             decrypted_json = SECURITY.decrypt(encrypted_payload)
@@ -308,6 +314,8 @@ def handle_task(encrypted_payload, local_target, gateway_url):
 def start_connector(gateway_url, secret, local_target, pin, dashboard_port):
     global SECURITY
     SECURITY = SecurityLayer(secret)
+    gateway_url = strip_trailing_slashes(gateway_url)
+    local_target = strip_trailing_slashes(local_target)
 
     dash_thread = threading.Thread(
         target=run_local_dashboard, args=(dashboard_port, gateway_url, pin)
