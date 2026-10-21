@@ -375,6 +375,8 @@ def start_connector(gateway_url, secret, local_target, pin, dashboard_port):
                         continue
                     try:
                         wrapper = json.loads(line.decode("utf-8"))
+                        if not isinstance(wrapper, dict):
+                            continue
                         encrypted_payload = wrapper.get("payload")
 
                         if encrypted_payload:
