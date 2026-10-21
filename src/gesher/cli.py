@@ -127,9 +127,7 @@ def install_cloudflared_macos(url):
             tar.extract(member)
 
     os.chmod("cloudflared", 0o755)
-    subprocess.run(
-        ["sudo", "mv", "cloudflared", "/usr/local/bin/"], check=True
-    )
+    subprocess.run(["sudo", "mv", "cloudflared", "/usr/local/bin/"], check=True)
 
 
 def start_cloudflared_tunnel(port):

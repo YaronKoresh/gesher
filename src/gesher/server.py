@@ -144,8 +144,7 @@ def drop_connection_headers(headers):
 
 def encode_raw_path(path):
     return "".join(
-        char if ord(char) < 128 else "%{:02X}".format(ord(char) & 0xFF)
-        for char in path
+        char if ord(char) < 128 else f"%{ord(char) & 0xFF:02X}" for char in path
     )
 
 

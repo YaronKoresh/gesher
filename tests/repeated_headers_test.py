@@ -23,9 +23,7 @@ class TestRepeatedRequestHeaders(unittest.TestCase):
         self.assertEqual(result, {"Accept": "x, y, z"})
 
     def test_single_headers_are_unchanged(self):
-        result = server.merge_repeated_headers(
-            parsed("Host: h\r\nAccept: x")
-        )
+        result = server.merge_repeated_headers(parsed("Host: h\r\nAccept: x"))
         self.assertEqual(result, {"Host": "h", "Accept": "x"})
 
     def test_forwarded_for_still_gets_the_peer_address_once(self):

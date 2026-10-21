@@ -14,7 +14,9 @@ class TestCloudflaredInstallRobustness(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.addCleanup(os.chdir, self.old_cwd)
 
-    def test_windows_uses_the_downloaded_file_instead_of_downloading_again(self):
+    def test_windows_uses_the_downloaded_file_instead_of_downloading_again(
+        self,
+    ):
         calls = []
 
         def run(cmd, **kwargs):
