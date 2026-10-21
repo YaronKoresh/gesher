@@ -1,4 +1,5 @@
 import http.client
+import socket
 import threading
 import time
 import unittest
@@ -10,6 +11,23 @@ from gesher.security import SecurityLayer
 STATS = '{"uptime":1,"requests":2,"tx":3,"rx":4,"clients":[]}'
 
 
+def free_port():
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
+
+
+def wait_until_listening(port, seconds=10):
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        try:
+            socket.create_connection(("127.0.0.1", port), timeout=0.2).close()
+            return
+        except OSError:
+            time.sleep(0.02)
+    raise RuntimeError(f"nothing is listening on port {port}")
+
+
 class TestDashboardPage(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -17,7 +35,7 @@ class TestDashboardPage(unittest.TestCase):
         response = MagicMock(
             status_code=200, text=client.SECURITY.encrypt(STATS)
         )
-        cls.port = 18796
+        cls.port = free_port()
         cls.patch = patch("gesher.client.requests.post", return_value=response)
         cls.patch.start()
         threading.Thread(
@@ -25,7 +43,7 @@ class TestDashboardPage(unittest.TestCase):
             args=(cls.port, "http://gateway", "PIN"),
             daemon=True,
         ).start()
-        time.sleep(0.5)
+        wait_until_listening(cls.port)
 
     @classmethod
     def tearDownClass(cls):
