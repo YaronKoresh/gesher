@@ -8,7 +8,7 @@ import urllib.parse
 
 import requests
 
-from .security import SecurityLayer
+from .security import SIGNATURE_WINDOW_SECONDS, SecurityLayer
 
 logging.basicConfig(
     level=logging.INFO, format="[%(asctime)s] %(message)s", datefmt="%H:%M:%S"
@@ -341,7 +341,9 @@ def start_connector(gateway_url, secret, local_target, pin, dashboard_port):
                     return False
                 elif r.status_code == 403:
                     logger.critical(
-                        "⛔ Access Denied: Invalid Secret or Signature."
+                        "⛔ Access Denied: Invalid Secret or Signature. "
+                        "Also check that this computer's clock is within "
+                        f"{SIGNATURE_WINDOW_SECONDS} seconds of the server's."
                     )
                     return False
                 elif r.status_code != 200:
