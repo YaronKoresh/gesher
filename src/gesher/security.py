@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import hmac
+import secrets
 import time
 
 from cryptography.fernet import Fernet
@@ -26,10 +27,13 @@ class SecurityLayer:
 
     def get_auth_header(self) -> str:
         timestamp = str(int(time.time()))
+        nonce = secrets.token_hex(8)
         signature = hmac.new(
-            self.secret.encode(), timestamp.encode(), hashlib.sha256
+            self.secret.encode(),
+            f"{timestamp}.{nonce}".encode(),
+            hashlib.sha256,
         ).hexdigest()
-        return f"{timestamp}:{signature}"
+        return f"{timestamp}:{nonce}.{signature}"
 
     def verify_signature(
         self, auth_header: str, window_seconds: int = 30
@@ -45,11 +49,19 @@ class SecurityLayer:
             if abs(current_time - timestamp) > window_seconds:
                 return False, None
 
+            nonce, dot, mac = signature.rpartition(".")
+            if dot:
+                if not nonce or len(nonce) > 64:
+                    return False, None
+                signed = f"{timestamp_str}.{nonce}"
+            else:
+                signed = timestamp_str
+
             expected_sig = hmac.new(
-                self.secret.encode(), timestamp_str.encode(), hashlib.sha256
+                self.secret.encode(), signed.encode(), hashlib.sha256
             ).hexdigest()
 
-            is_valid = hmac.compare_digest(expected_sig, signature)
+            is_valid = hmac.compare_digest(expected_sig, mac)
             return is_valid, signature
         except Exception:
             return False, None

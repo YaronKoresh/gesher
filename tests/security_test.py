@@ -74,3 +74,53 @@ class TestSecurityLayer(unittest.TestCase):
         encrypted = self.security.encrypt(json.dumps(data))
         decrypted = json.loads(self.security.decrypt(encrypted))
         self.assertEqual(decrypted, data)
+
+    def test_headers_in_the_same_second_are_unique(self):
+        headers = {self.security.get_auth_header() for _ in range(50)}
+        self.assertEqual(len(headers), 50)
+        for header in headers:
+            is_valid, _ = self.security.verify_signature(header)
+            self.assertTrue(is_valid)
+
+    def test_verify_signature_returns_distinct_keys_in_the_same_second(self):
+        with patch("gesher.security.time.time", return_value=1000.0):
+            first = self.security.get_auth_header()
+            second = self.security.get_auth_header()
+            _, key_a = self.security.verify_signature(first)
+            _, key_b = self.security.verify_signature(second)
+        self.assertNotEqual(key_a, key_b)
+
+    def test_verify_signature_accepts_legacy_header(self):
+        import hashlib
+        import hmac
+
+        timestamp = str(int(time.time()))
+        mac = hmac.new(
+            b"test-secret", timestamp.encode(), hashlib.sha256
+        ).hexdigest()
+        is_valid, signature = self.security.verify_signature(
+            f"{timestamp}:{mac}"
+        )
+        self.assertTrue(is_valid)
+        self.assertEqual(signature, mac)
+
+    def test_verify_signature_rejects_tampered_nonce(self):
+        header = self.security.get_auth_header()
+        timestamp, token = header.split(":", 1)
+        nonce, mac = token.split(".", 1)
+        is_valid, _ = self.security.verify_signature(
+            f"{timestamp}:{nonce}0.{mac}"
+        )
+        self.assertFalse(is_valid)
+
+    def test_verify_signature_rejects_empty_or_oversized_nonce(self):
+        header = self.security.get_auth_header()
+        timestamp, token = header.split(":", 1)
+        mac = token.split(".", 1)[1]
+        for nonce in ("", "a" * 65):
+            with self.subTest(nonce_length=len(nonce)):
+                is_valid, signature = self.security.verify_signature(
+                    f"{timestamp}:{nonce}.{mac}"
+                )
+                self.assertFalse(is_valid)
+                self.assertIsNone(signature)

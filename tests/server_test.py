@@ -238,3 +238,25 @@ class TestServer(unittest.TestCase):
 
         self.assertTrue(event.is_set())
         handler.wfile.write.assert_called_with(b"OK")
+
+    def test_two_valid_requests_in_the_same_second_are_both_accepted(self):
+        with patch("gesher.security.time.time", return_value=2000.0), patch(
+            "gesher.server.time.time", return_value=2000.0
+        ):
+            first = self.create_mock_handler()
+            second = self.create_mock_handler()
+            first.headers.get.return_value = self.security.get_auth_header()
+            second.headers.get.return_value = self.security.get_auth_header()
+
+            self.assertTrue(first.verify_signature())
+            self.assertTrue(second.verify_signature())
+
+    def test_resending_the_same_header_is_rejected_as_replay(self):
+        header = self.security.get_auth_header()
+        first = self.create_mock_handler()
+        second = self.create_mock_handler()
+        first.headers.get.return_value = header
+        second.headers.get.return_value = header
+
+        self.assertTrue(first.verify_signature())
+        self.assertFalse(second.verify_signature())

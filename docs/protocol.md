@@ -26,9 +26,11 @@ The Client initiates a long-lived HTTP POST request to establish the tunnel.
 **Endpoint:** `POST /_connect_tunnel`
 
 **Headers:**
-* `Authorization`: `TIMESTAMP:SIGNATURE`
+* `Authorization`: `TIMESTAMP:NONCE.SIGNATURE`
     * `TIMESTAMP`: Current Unix time (seconds).
-    * `SIGNATURE`: `HMAC_SHA256(SHARED_SECRET, TIMESTAMP)`.
+    * `NONCE`: A random hex string (at most 64 characters), new for every request, so that two requests in the same second never share a signature.
+    * `SIGNATURE`: `HMAC_SHA256(SHARED_SECRET, TIMESTAMP + "." + NONCE)`.
+    * The legacy form `TIMESTAMP:SIGNATURE`, with `SIGNATURE = HMAC_SHA256(SHARED_SECRET, TIMESTAMP)`, is still accepted.
 * `X-Join-Code`: The active `GATEKEEPER_PIN`.
 * `X-Client-ID`: (Optional) Client identifier.
 
