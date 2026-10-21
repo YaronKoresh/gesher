@@ -1,5 +1,6 @@
 import base64
 import collections
+import hmac
 import http.server
 import ipaddress
 import json
@@ -129,6 +130,14 @@ def with_forwarded_for(headers, address):
         value = existing if parts[-1] == address else f"{existing}, {address}"
     result[name] = value
     return result
+
+
+def pin_matches(candidate):
+    if not isinstance(candidate, str) or not candidate or not GATEKEEPER_PIN:
+        return False
+    return hmac.compare_digest(
+        candidate.encode("utf-8"), GATEKEEPER_PIN.encode("utf-8")
+    )
 
 
 def frame_chunk(data):
@@ -298,7 +307,7 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
             return
 
         client_pin = self.headers.get("X-Join-Code")
-        if not client_pin or client_pin != GATEKEEPER_PIN:
+        if not pin_matches(client_pin):
             self.record_auth_failure()
             self.send_error(401)
             return
@@ -377,7 +386,7 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
             return
 
         client_pin = self.headers.get("X-Join-Code")
-        if not client_pin or client_pin != GATEKEEPER_PIN:
+        if not pin_matches(client_pin):
             logger.warning("✋ Blocked Connection (Invalid PIN)")
             self.record_auth_failure()
             self.send_error(401)
