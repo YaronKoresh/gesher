@@ -186,10 +186,12 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
         json_str = json.dumps(data)
         encrypted_payload = SECURITY.encrypt(json_str)
 
+        payload = encrypted_payload.encode()
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
+        self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
-        self.wfile.write(encrypted_payload.encode())
+        self.wfile.write(payload)
 
     def do_POST(self):
         if self.path == "/_connect_tunnel":
@@ -309,10 +311,12 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
             pending["data"] = response_data
             pending["event"].set()
             self.send_response(200)
+            self.send_header("Content-Length", "2")
             self.end_headers()
             self.wfile.write(b"OK")
         else:
             self.send_response(404)
+            self.send_header("Content-Length", "0")
             self.end_headers()
 
     def handle_public_request(self):
