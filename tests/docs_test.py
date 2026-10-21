@@ -88,6 +88,7 @@ class TestRequestHandlingIsDocumented(unittest.TestCase):
             "joined with",
             "Connection-level headers",
             "two different `Content-Length` values",
+            "other than plain `chunked`",
             "**Raw Bytes in the Path:**",
             "waits 5 seconds",
         ):

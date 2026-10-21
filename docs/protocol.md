@@ -79,7 +79,7 @@ The Server sends a JSON object on a new line.
 
 **Request Path:** `url` always starts with `/`. The Server answers `400 Bad Request` to a public request whose path does not, and the Client does not forward such a task: it answers it with a `400` response instead.
 
-**Request Headers:** A header that appears more than once is sent as a single header: the values are joined with `, `, and repeated `Cookie` headers with `; `. Connection-level headers (`Connection` and every header it names, `Keep-Alive`, `Proxy-Connection`, `Proxy-Authorization`, `TE`, `Trailer`, `Upgrade` and `Expect`) belong to the public connection and are not forwarded. `X-Forwarded-For` ends with the address of the visitor. A request with two different `Content-Length` values is answered with `400`; a `Content-Length` or chunk size that is not made of plain digits is answered with `400` too.
+**Request Headers:** A header that appears more than once is sent as a single header: the values are joined with `, `, and repeated `Cookie` headers with `; `. Connection-level headers (`Connection` and every header it names, `Keep-Alive`, `Proxy-Connection`, `Proxy-Authorization`, `TE`, `Trailer`, `Upgrade` and `Expect`) belong to the public connection and are not forwarded. `X-Forwarded-For` ends with the address of the visitor. A request with two different `Content-Length` values is answered with `400`; a `Content-Length` or chunk size that is not made of plain digits is answered with `400` too. A `Transfer-Encoding` other than plain `chunked` is answered with `501`.
 
 **Raw Bytes in the Path:** Bytes above 127 in the request path are percent-encoded once by the Server (`0xD7` becomes `%D7`), so the Client sends exactly the bytes the visitor sent.
 
