@@ -80,5 +80,20 @@ class TestDocsMatchCode(unittest.TestCase):
         self.assertIn(str(server.AUTH_FAILURE_WINDOW), read("architecture.md"))
 
 
+class TestRequestHandlingIsDocumented(unittest.TestCase):
+    def test_request_header_handling_is_documented(self):
+        text = read("protocol.md")
+        for phrase in (
+            "**Request Headers:**",
+            "joined with",
+            "Connection-level headers",
+            "two different `Content-Length` values",
+            "**Raw Bytes in the Path:**",
+            "waits 5 seconds",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, text)
+
+
 if __name__ == "__main__":
     unittest.main()

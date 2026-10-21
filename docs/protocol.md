@@ -39,7 +39,7 @@ The Client initiates a long-lived HTTP POST request to establish the tunnel.
 * **Content-Type:** `application/x-ndjson` (Newline Delimited JSON)
 * **Transfer-Encoding:** `chunked`. Every Task is sent as its own chunk, so the Client receives it as soon as it is sent, whatever its size.
 * **Body:** An infinite stream of JSON objects. Each line is a "Task".
-* **Keepalive:** While no Task is sent, the Server writes an empty line every 15 seconds. The Client ignores empty lines and drops the connection and reconnects after 45 seconds of silence.
+* **Keepalive:** While no Task is sent, the Server writes an empty line every 15 seconds. The Client ignores empty lines and drops the connection and reconnects after 45 seconds of silence. After any end of the stream, clean or not, the Client waits 5 seconds before it connects again.
 
 **Response (Failure):**
 * `401 Unauthorized`: Invalid PIN.
@@ -78,6 +78,10 @@ The Server sends a JSON object on a new line.
 **Request Body:** A public request sent with `Transfer-Encoding: chunked` is read to the end by the Server (up to 10 MB) and forwarded with a plain `Content-Length` instead.
 
 **Request Path:** `url` always starts with `/`. The Server answers `400 Bad Request` to a public request whose path does not, and the Client does not forward such a task: it answers it with a `400` response instead.
+
+**Request Headers:** A header that appears more than once is sent as a single header: the values are joined with `, `, and repeated `Cookie` headers with `; `. Connection-level headers (`Connection` and every header it names, `Keep-Alive`, `Proxy-Connection`, `Proxy-Authorization`, `TE`, `Trailer`, `Upgrade` and `Expect`) belong to the public connection and are not forwarded. `X-Forwarded-For` ends with the address of the visitor. A request with two different `Content-Length` values is answered with `400`; a `Content-Length` or chunk size that is not made of plain digits is answered with `400` too.
+
+**Raw Bytes in the Path:** Bytes above 127 in the request path are percent-encoded once by the Server (`0xD7` becomes `%D7`), so the Client sends exactly the bytes the visitor sent.
 
 **Wire Format:**
 
