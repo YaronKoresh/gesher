@@ -85,6 +85,8 @@ Run `gesher --version` to print the installed version.
 | `--port` | Port to listen on for public requests. | `8000` |
 | `--public` | Automatically start a Cloudflare tunnel for a public URL. | `False` |
 
+On Linux the `cloudflared` package is installed with `dpkg` (through `sudo`, unless you run as root); on systems without `dpkg`, install `cloudflared` by hand first.
+
 ### Client Mode
 
 | Argument/Flag | Description | Default |

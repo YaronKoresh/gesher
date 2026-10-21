@@ -77,10 +77,70 @@ class TestCloudflaredInstallRobustness(unittest.TestCase):
             "gesher.cli.platform.machine", return_value="x86_64"
         ), patch("gesher.cli.subprocess.run", side_effect=run), patch(
             "gesher.cli.urllib.request.urlretrieve", side_effect=retrieve
-        ):
+        ), patch(
+            "gesher.cli.shutil.which", return_value="/usr/bin/dpkg"
+        ), patch("gesher.cli.os.geteuid", return_value=1000, create=True):
             cli.install_cloudflared()
 
         self.assertEqual(os.listdir("."), [])
+
+    def install_on_linux(self, euid):
+        calls = []
+
+        def retrieve(url, path):
+            open(path, "w").close()
+
+        def run(cmd, **kwargs):
+            calls.append(list(cmd))
+            if cmd[-1] == "--version":
+                raise FileNotFoundError()
+            return MagicMock()
+
+        with patch("gesher.cli.platform.system", return_value="Linux"), patch(
+            "gesher.cli.platform.machine", return_value="x86_64"
+        ), patch("gesher.cli.subprocess.run", side_effect=run), patch(
+            "gesher.cli.urllib.request.urlretrieve", side_effect=retrieve
+        ), patch(
+            "gesher.cli.shutil.which", return_value="/usr/bin/dpkg"
+        ), patch("gesher.cli.os.geteuid", return_value=euid, create=True):
+            cli.install_cloudflared()
+        return [c for c in calls if c[-1] != "--version"]
+
+    def test_root_runs_dpkg_without_sudo(self):
+        calls = self.install_on_linux(0)
+
+        self.assertEqual(calls, [["dpkg", "-i", "cloudflared-linux-amd64.deb"]])
+
+    def test_regular_user_runs_dpkg_through_sudo(self):
+        calls = self.install_on_linux(1000)
+
+        self.assertEqual(
+            calls, [["sudo", "dpkg", "-i", "cloudflared-linux-amd64.deb"]]
+        )
+
+    def test_linux_without_dpkg_explains_and_downloads_nothing(self):
+        with patch("gesher.cli.platform.system", return_value="Linux"), patch(
+            "gesher.cli.platform.machine", return_value="x86_64"
+        ), patch(
+            "gesher.cli.subprocess.run", side_effect=FileNotFoundError()
+        ), patch("gesher.cli.shutil.which", return_value=None), patch(
+            "gesher.cli.urllib.request.urlretrieve"
+        ) as retrieve, patch("builtins.print") as out:
+            cli.install_cloudflared()
+
+        retrieve.assert_not_called()
+        text = " ".join(str(c.args[0]) for c in out.call_args_list)
+        self.assertIn("dpkg", text)
+
+    def test_administrator_command_is_unchanged_for_root(self):
+        with patch("gesher.cli.os.geteuid", return_value=0, create=True):
+            self.assertEqual(
+                cli.as_administrator(["mv", "a", "b"]), ["mv", "a", "b"]
+            )
+        with patch("gesher.cli.os.geteuid", return_value=501, create=True):
+            self.assertEqual(
+                cli.as_administrator(["mv", "a", "b"]), ["sudo", "mv", "a", "b"]
+            )
 
     def test_tunnel_start_failure_returns_no_url_instead_of_raising(self):
         with patch(

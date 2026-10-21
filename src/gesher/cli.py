@@ -2,6 +2,7 @@ import argparse
 import os
 import platform
 import re
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -44,6 +45,13 @@ def cloudflared_binary():
     return "cloudflared"
 
 
+def as_administrator(command):
+    geteuid = getattr(os, "geteuid", None)
+    if geteuid is not None and geteuid() == 0:
+        return command
+    return ["sudo", *command]
+
+
 def remove_quietly(path):
     try:
         os.remove(path)
@@ -73,12 +81,19 @@ def install_cloudflared():
         if arch is None:
             print(f"❌ No cloudflared package for the CPU type '{machine}'.")
             return
+        if shutil.which("dpkg") is None:
+            print(
+                "❌ Automatic install needs dpkg. Install cloudflared by hand."
+            )
+            return
         package = f"cloudflared-linux-{arch}.deb"
         url = f"https://github.com/cloudflare/cloudflared/releases/latest/download/{package}"
         print("Downloading cloudflared for Linux...")
         try:
             urllib.request.urlretrieve(url, package)
-            subprocess.run(["sudo", "dpkg", "-i", package], check=True)
+            subprocess.run(
+                as_administrator(["dpkg", "-i", package]), check=True
+            )
         except Exception as e:
             print(f"❌ Installation failed: {e}")
             return
@@ -127,7 +142,9 @@ def install_cloudflared_macos(url):
             tar.extract(member)
 
     os.chmod("cloudflared", 0o755)
-    subprocess.run(["sudo", "mv", "cloudflared", "/usr/local/bin/"], check=True)
+    subprocess.run(
+        as_administrator(["mv", "cloudflared", "/usr/local/bin/"]), check=True
+    )
 
 
 TUNNEL_URL_PATTERN = re.compile(r"https://([\w-]+)\.trycloudflare\.com")
