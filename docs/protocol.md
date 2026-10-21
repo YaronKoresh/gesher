@@ -9,7 +9,7 @@ The protocol is designed to be **Firewall-Friendly** (outbound HTTP only) and **
 ## 🔐 Security Primitives
 
 All communication relies on two shared secrets:
-1.  **`SHARED_SECRET`**: Used for AES-256 encryption and HMAC signatures. Never sent over the wire.
+1.  **`SHARED_SECRET`**: Used for Fernet encryption (AES-128) and HMAC signatures. Never sent over the wire.
 2.  **`GATEKEEPER_PIN`**: A session-specific token sent in headers to authorize the connection.
 
 ### Encryption (The "Gibberish" Layer)
@@ -32,10 +32,10 @@ The Client initiates a long-lived HTTP POST request to establish the tunnel.
     * `SIGNATURE`: `HMAC_SHA256(SHARED_SECRET, TIMESTAMP + "." + NONCE)`.
     * The legacy form `TIMESTAMP:SIGNATURE`, with `SIGNATURE = HMAC_SHA256(SHARED_SECRET, TIMESTAMP)`, is still accepted.
 * `X-Join-Code`: The active `GATEKEEPER_PIN`.
-* `X-Client-ID`: (Optional) Client identifier.
 
 **Response (Success):**
 * **Status:** `200 OK`
+* **X-Client-ID:** The identifier the Server assigned to this Client.
 * **Content-Type:** `application/x-ndjson` (Newline Delimited JSON)
 * **Transfer-Encoding:** `chunked`. Every Task is sent as its own chunk, so the Client receives it as soon as it is sent, whatever its size.
 * **Body:** An infinite stream of JSON objects. Each line is a "Task".
@@ -44,6 +44,7 @@ The Client initiates a long-lived HTTP POST request to establish the tunnel.
 * `401 Unauthorized`: Invalid PIN.
 * `403 Forbidden`: Invalid HMAC Signature or Replay Attack detected.
 * `429 Too Many Requests`: Rate limit exceeded.
+* `503 Service Unavailable`: The Server already has the maximum of 50 connected Clients (`Server Full`).
 
 ---
 
@@ -68,6 +69,8 @@ The Server sends a JSON object on a new line.
 }
 
 ```
+
+**Request Methods:** The Server forwards `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD` and `OPTIONS` requests. Any other method is answered with `501`. The answer to a `HEAD` request carries the `Content-Length` of the local service and no body.
 
 **Request Body:** A public request sent with `Transfer-Encoding: chunked` is read to the end by the Server (up to 10 MB) and forwarded with a plain `Content-Length` instead.
 
