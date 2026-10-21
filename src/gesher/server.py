@@ -39,6 +39,7 @@ REQUEST_TIMEOUT = 30
 MAX_CLIENTS = 50
 MAX_BODY_SIZE = 10 * 1024 * 1024
 MAX_CHUNK_LINE = 1024
+HEX_DIGITS = frozenset(b"0123456789abcdefABCDEF")
 RATE_LIMIT_WINDOW = 60
 RATE_LIMIT_MAX_REQ = 100
 IP_REQUEST_COUNTS = collections.defaultdict(list)
@@ -265,9 +266,10 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
         body = bytearray()
         while True:
             line = self.rfile.readline(MAX_CHUNK_LINE)
-            try:
-                size = int(line.split(b";", 1)[0].strip(), 16)
-            except ValueError:
+            digits = line.split(b";", 1)[0].strip()
+            if digits and all(b in HEX_DIGITS for b in digits):
+                size = int(digits, 16)
+            else:
                 size = -1
             if size < 0:
                 self.send_error(400, "Bad Chunk Size")
