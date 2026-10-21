@@ -3,6 +3,7 @@ import os
 import platform
 import re
 import subprocess
+import sys
 import tarfile
 import time
 import urllib.parse
@@ -229,13 +230,15 @@ def main():
         finally:
             stop_tunnel(tunnel)
     elif args.mode == "client":
-        start_connector(
+        accepted = start_connector(
             args.gateway,
             args.secret,
             args.target,
             args.pin,
             args.dashboard_port,
         )
+        if accepted is False:
+            sys.exit(1)
 
 
 if __name__ == "__main__":

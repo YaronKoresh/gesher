@@ -278,12 +278,12 @@ def start_connector(gateway_url, secret, local_target, pin, dashboard_port):
             ) as r:
                 if r.status_code == 401:
                     logger.critical("⛔ Gatekeeper Rejected: Invalid PIN.")
-                    return
+                    return False
                 elif r.status_code == 403:
                     logger.critical(
                         "⛔ Access Denied: Invalid Secret or Signature."
                     )
-                    return
+                    return False
                 elif r.status_code != 200:
                     logger.warning(
                         f"⚠️ Gateway Status {r.status_code}. Retrying..."
