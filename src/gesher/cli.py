@@ -191,11 +191,24 @@ def non_empty(value):
 
 
 def http_url(value):
-    parts = urllib.parse.urlsplit(value)
-    if parts.scheme not in ("http", "https") or not parts.netloc:
-        raise argparse.ArgumentTypeError(
-            f"'{value}' must start with http:// or https:// and name a host"
-        )
+    problem = (
+        f"'{value}' must be an http:// or https:// address with a host, "
+        "an optional port from 1 to 65535, and no query or fragment"
+    )
+    if any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in value):
+        raise argparse.ArgumentTypeError(problem)
+    try:
+        parts = urllib.parse.urlsplit(value)
+        port = parts.port
+        host = parts.hostname
+    except ValueError:
+        raise argparse.ArgumentTypeError(problem) from None
+    if parts.scheme not in ("http", "https") or not host:
+        raise argparse.ArgumentTypeError(problem)
+    if port is not None and not 1 <= port <= 65535:
+        raise argparse.ArgumentTypeError(problem)
+    if parts.netloc.endswith(":") or "?" in value or "#" in value:
+        raise argparse.ArgumentTypeError(problem)
     return value
 
 
