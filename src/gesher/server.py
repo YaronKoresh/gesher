@@ -244,9 +244,10 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def read_content_length(self):
         raw = self.headers.get("Content-Length", "0")
-        try:
+        raw = raw.strip() if isinstance(raw, str) else ""
+        if raw.isascii() and raw.isdigit():
             length = int(raw)
-        except ValueError:
+        else:
             length = -1
         if length < 0:
             self.send_error(400, "Bad Content-Length")
