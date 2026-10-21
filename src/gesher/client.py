@@ -123,11 +123,18 @@ def run_local_dashboard(port, gateway_url, pin):
             else:
                 self.send_error(404)
 
-    logger.info(f"📊 Local Dashboard running at http://localhost:{port}")
-    server = http.server.ThreadingHTTPServer(
-        ("localhost", port), LocalDashHandler
-    )
+    try:
+        server = http.server.ThreadingHTTPServer(
+            ("localhost", port), LocalDashHandler
+        )
+    except OSError as exc:
+        logger.warning(
+            f"⚠️ Local Dashboard not started: cannot listen on port {port} "
+            f"({exc.strerror or exc}). The tunnel keeps running."
+        )
+        return
     server.daemon_threads = True
+    logger.info(f"📊 Local Dashboard running at http://localhost:{port}")
     server.serve_forever()
 
 

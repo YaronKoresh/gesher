@@ -8,6 +8,7 @@ import secrets
 import select
 import socket
 import socketserver
+import sys
 import threading
 import time
 import uuid
@@ -577,7 +578,14 @@ def run_server(port=8000, secret="default-secret"):
     SECURITY = SecurityLayer(secret)
     GATEKEEPER_PIN = secrets.token_hex(3).upper()
 
-    server = ThreadedHTTPServer(("", port), BridgeRequestHandler)
+    try:
+        server = ThreadedHTTPServer(("", port), BridgeRequestHandler)
+    except OSError as exc:
+        print(
+            f"\n❌ Cannot listen on port {port}: {exc.strerror or exc}\n",
+            file=sys.stderr,
+        )
+        raise SystemExit(1) from None
     print("\n🌉 Gesher Secure Server")
     print("--------------------------------")
     print(f"📍 Port:       {port}")
