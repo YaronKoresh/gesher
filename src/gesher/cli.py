@@ -9,6 +9,7 @@ import time
 import urllib.parse
 import urllib.request
 
+from . import __version__
 from .client import start_connector
 from .server import run_server
 
@@ -171,6 +172,9 @@ def http_url(value):
 def main():
     parser = argparse.ArgumentParser(
         prog="gesher", description="Gesher: Secure HTTP Tunneling"
+    )
+    parser.add_argument(
+        "--version", action="version", version=f"gesher {__version__}"
     )
     subparsers = parser.add_subparsers(dest="mode", required=True)
 

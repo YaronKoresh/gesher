@@ -75,6 +75,8 @@ Open your browser to `http://localhost:9000` (the default `dashboard-port`). You
 
 ## Command Line Options
 
+Run `gesher --version` to print the installed version.
+
 ### Server Mode
 
 | Flag | Description | Default |
