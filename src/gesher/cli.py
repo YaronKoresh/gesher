@@ -15,6 +15,26 @@ WIN_CF_PATH = os.path.join(
 )
 
 
+LINUX_PACKAGE_ARCH = {
+    "x86_64": "amd64",
+    "amd64": "amd64",
+    "aarch64": "arm64",
+    "arm64": "arm64",
+    "armv7l": "armhf",
+    "armv6l": "armhf",
+    "armhf": "armhf",
+    "i386": "386",
+    "i686": "386",
+}
+
+TUNNEL_WAIT_SECONDS = 30
+TUNNEL_POLL_INTERVAL = 0.5
+
+
+def linux_package_arch(machine):
+    return LINUX_PACKAGE_ARCH.get(machine.lower())
+
+
 def install_cloudflared():
     print(">> Checking for cloudflared (for public URL)...")
     try:
@@ -31,15 +51,17 @@ def install_cloudflared():
     is_arm = "arm" in machine or "aarch64" in machine
 
     if system == "Linux":
-        url = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb"
+        arch = linux_package_arch(machine)
+        if arch is None:
+            print(f"❌ No cloudflared package for the CPU type '{machine}'.")
+            return
+        package = f"cloudflared-linux-{arch}.deb"
+        url = f"https://github.com/cloudflare/cloudflared/releases/latest/download/{package}"
         print("Downloading cloudflared for Linux...")
         try:
-            urllib.request.urlretrieve(url, "cloudflared-linux-amd64.deb")
-            subprocess.run(
-                ["sudo", "dpkg", "-i", "cloudflared-linux-amd64.deb"],
-                check=True,
-            )
-            os.remove("cloudflared-linux-amd64.deb")
+            urllib.request.urlretrieve(url, package)
+            subprocess.run(["sudo", "dpkg", "-i", package], check=True)
+            os.remove(package)
         except Exception as e:
             print(f"❌ Installation failed: {e}")
             return
@@ -79,11 +101,16 @@ def start_cloudflared_tunnel(port):
             stdout=log_file,
             stderr=log_file,
         )
-        time.sleep(5)
-        with open("tunnel.log") as f:
-            content = f.read()
+        deadline = time.time() + TUNNEL_WAIT_SECONDS
+        while True:
+            time.sleep(TUNNEL_POLL_INTERVAL)
+            with open("tunnel.log") as f:
+                content = f.read()
             match = re.search(r"https://[\w-]+\.trycloudflare\.com", content)
-            return proc, (match.group(0) if match else None)
+            if match:
+                return proc, match.group(0)
+            if proc.poll() is not None or time.time() >= deadline:
+                return proc, None
 
 
 def main():
@@ -135,7 +162,13 @@ def main():
         if args.public:
             install_cloudflared()
             _, url = start_cloudflared_tunnel(args.port)
-            print(f"\n✅ GESHER LIVE\n🔗 URL: {url}\n")
+            if url:
+                print(f"\n✅ GESHER LIVE\n🔗 URL: {url}\n")
+            else:
+                print(
+                    "\n❌ The public URL did not appear. "
+                    "See tunnel.log for the cloudflared output.\n"
+                )
         run_server(args.port, args.secret)
     elif args.mode == "client":
         start_connector(
