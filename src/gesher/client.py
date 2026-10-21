@@ -391,6 +391,9 @@ def start_connector(gateway_url, secret, local_target, pin, dashboard_port):
                     except json.JSONDecodeError:
                         pass
 
+            logger.warning("❌ Tunnel closed. Reconnecting in 5s...")
+            time.sleep(5)
+
         except requests.exceptions.ConnectionError:
             logger.warning("❌ Connection Lost. Reconnecting in 5s...")
             time.sleep(5)
