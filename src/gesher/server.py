@@ -5,6 +5,8 @@ import json
 import logging
 import queue
 import secrets
+import select
+import socket
 import socketserver
 import threading
 import time
@@ -50,6 +52,27 @@ STATS = {
     "blocked_reqs": 0,
 }
 STATS_LOCK = threading.Lock()
+
+
+DISCONNECT_CHECK_INTERVAL = 0.5
+
+
+class SystemTask(dict):
+    pass
+
+
+def redistribute_task(task):
+    global NEXT_CLIENT_INDEX
+    if isinstance(task, SystemTask):
+        return False
+    with CLIENT_LOCK:
+        queues = [data["queue"] for data in CLIENTS.values()]
+        if not queues:
+            return False
+        target = queues[NEXT_CLIENT_INDEX % len(queues)]
+        NEXT_CLIENT_INDEX += 1
+    target.put(task)
+    return True
 
 
 DROPPED_RESPONSE_HEADERS = frozenset(
@@ -282,14 +305,24 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("X-Client-ID", client_id)
         self.end_headers()
 
+        pending = None
         try:
             while True:
-                task = client_queue.get()
+                try:
+                    task = client_queue.get(timeout=DISCONNECT_CHECK_INTERVAL)
+                except queue.Empty:
+                    if self.client_disconnected():
+                        break
+                    continue
+                pending = task
+                if self.client_disconnected():
+                    break
                 json_str = json.dumps(task) + "\n"
                 data = json_str.encode("utf-8")
                 self.wfile.write(frame_chunk(data))
                 self.wfile.flush()
                 self.track_traffic(tx=len(data))
+                pending = None
         except Exception:
             pass
         finally:
@@ -297,7 +330,24 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
                 if client_id in CLIENTS:
                     del CLIENTS[client_id]
             logger.info(f"👋 Client Disconnected: {client_id}")
+            leftovers = [] if pending is None else [pending]
+            while True:
+                try:
+                    leftovers.append(client_queue.get_nowait())
+                except queue.Empty:
+                    break
+            for task in leftovers:
+                redistribute_task(task)
             self.broadcast_client_list()
+
+    def client_disconnected(self):
+        try:
+            readable, _, _ = select.select([self.connection], [], [], 0)
+            if not readable:
+                return False
+            return self.connection.recv(1, socket.MSG_PEEK) == b""
+        except (OSError, ValueError):
+            return True
 
     def handle_tunnel_response(self):
         if not self.verify_signature():
@@ -422,7 +472,7 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
         with CLIENT_LOCK:
             for _cid, data in CLIENTS.items():
                 try:
-                    data["queue"].put({"payload": encrypted_msg})
+                    data["queue"].put(SystemTask({"payload": encrypted_msg}))
                 except Exception:
                     pass
 
