@@ -31,6 +31,7 @@ SEEN_SIGNATURES = {}
 SIGNATURE_LOCK = threading.Lock()
 
 
+REQUEST_TIMEOUT = 30
 MAX_CLIENTS = 50
 MAX_BODY_SIZE = 10 * 1024 * 1024
 RATE_LIMIT_WINDOW = 60
@@ -128,6 +129,7 @@ class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
 class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
+    timeout = REQUEST_TIMEOUT
 
     def log_request(self, code="-", size="-"):
         _junk = [code, size]

@@ -15,6 +15,7 @@ Unlike simple reverse proxies, Gesher uses a **Client-Initiated Bridge** model, 
     * Listens for public HTTP requests.
     * Manages the **Client Registry** (Load Balancing).
     * Enforces **DoS Protection** (Rate Limiting, IP Bans).
+    * Closes connections that do not send a complete request within 30 seconds.
     * Generates the session-specific **Gatekeeper PIN**.
     * **Blind Routing:** It receives encrypted traffic and passes it to clients without being able to read the payload (if SSL is used inside the tunnel, though Gesher adds its own AES layer).
 
