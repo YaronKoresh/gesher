@@ -38,11 +38,26 @@ def linux_package_arch(machine):
     return LINUX_PACKAGE_ARCH.get(machine.lower())
 
 
+def cloudflared_binary():
+    if platform.system() == "Windows" and os.path.exists(WIN_CF_PATH):
+        return WIN_CF_PATH
+    return "cloudflared"
+
+
+def remove_quietly(path):
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
 def install_cloudflared():
     print(">> Checking for cloudflared (for public URL)...")
     try:
         subprocess.run(
-            ["cloudflared", "--version"], check=True, capture_output=True
+            [cloudflared_binary(), "--version"],
+            check=True,
+            capture_output=True,
         )
         return
     except (FileNotFoundError, subprocess.CalledProcessError):
@@ -64,15 +79,21 @@ def install_cloudflared():
         try:
             urllib.request.urlretrieve(url, package)
             subprocess.run(["sudo", "dpkg", "-i", package], check=True)
-            os.remove(package)
         except Exception as e:
             print(f"❌ Installation failed: {e}")
             return
+        finally:
+            remove_quietly(package)
 
     elif system == "Windows":
         url = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
         print(f"Downloading for Windows to {WIN_CF_PATH}...")
-        urllib.request.urlretrieve(url, WIN_CF_PATH)
+        try:
+            urllib.request.urlretrieve(url, WIN_CF_PATH)
+        except Exception as e:
+            print(f"❌ Installation failed: {e}")
+            remove_quietly(WIN_CF_PATH)
+            return
         print("✅ cloudflared downloaded successfully.")
 
     elif system == "Darwin":
@@ -82,37 +103,48 @@ def install_cloudflared():
             url = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-amd64.tgz"
 
         print("Downloading for macOS...")
-        urllib.request.urlretrieve(url, "cf.tgz")
-        with tarfile.open("cf.tgz", "r:gz") as tar:
-            member = next(
-                (m for m in tar.getmembers() if m.name == "cloudflared"), None
-            )
-            if member is None or not member.isfile():
-                print("❌ The cloudflared archive has no cloudflared file.")
-                return
-            if hasattr(tarfile, "data_filter"):
-                tar.extract(member, filter="data")
-            else:
-                tar.extract(member)
+        try:
+            install_cloudflared_macos(url)
+        except Exception as e:
+            print(f"❌ Installation failed: {e}")
+            remove_quietly("cloudflared")
+        finally:
+            remove_quietly("cf.tgz")
 
-        os.chmod("cloudflared", 0o755)
-        subprocess.run(
-            ["sudo", "mv", "cloudflared", "/usr/local/bin/"], check=True
+
+def install_cloudflared_macos(url):
+    urllib.request.urlretrieve(url, "cf.tgz")
+    with tarfile.open("cf.tgz", "r:gz") as tar:
+        member = next(
+            (m for m in tar.getmembers() if m.name == "cloudflared"), None
         )
-        os.remove("cf.tgz")
+        if member is None or not member.isfile():
+            print("❌ The cloudflared archive has no cloudflared file.")
+            return
+        if hasattr(tarfile, "data_filter"):
+            tar.extract(member, filter="data")
+        else:
+            tar.extract(member)
+
+    os.chmod("cloudflared", 0o755)
+    subprocess.run(
+        ["sudo", "mv", "cloudflared", "/usr/local/bin/"], check=True
+    )
 
 
 def start_cloudflared_tunnel(port):
-    cf_bin = "cloudflared"
-    if platform.system() == "Windows" and os.path.exists(WIN_CF_PATH):
-        cf_bin = WIN_CF_PATH
+    cf_bin = cloudflared_binary()
 
     with open("tunnel.log", "w") as log_file:
-        proc = subprocess.Popen(
-            [cf_bin, "tunnel", "--url", f"http://localhost:{port}"],
-            stdout=log_file,
-            stderr=log_file,
-        )
+        try:
+            proc = subprocess.Popen(
+                [cf_bin, "tunnel", "--url", f"http://localhost:{port}"],
+                stdout=log_file,
+                stderr=log_file,
+            )
+        except OSError as e:
+            print(f"❌ Could not start cloudflared: {e}")
+            return None, None
         deadline = time.time() + TUNNEL_WAIT_SECONDS
         while True:
             time.sleep(TUNNEL_POLL_INTERVAL)
