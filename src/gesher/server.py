@@ -52,6 +52,32 @@ STATS = {
 STATS_LOCK = threading.Lock()
 
 
+def valid_tunnel_response(data):
+    if not isinstance(data, dict) or not isinstance(data.get("id"), str):
+        return False
+    status = data.get("status")
+    if isinstance(status, bool) or not isinstance(status, int):
+        return False
+    if not 100 <= status <= 599:
+        return False
+    headers = data.get("headers", {})
+    if not isinstance(headers, dict):
+        return False
+    for key, value in headers.items():
+        if not isinstance(key, str) or not isinstance(value, str):
+            return False
+    body = data.get("body", "")
+    if body is None or body == "":
+        return True
+    if not isinstance(body, str):
+        return False
+    try:
+        base64.b64decode(body, validate=True)
+    except Exception:
+        return False
+    return True
+
+
 class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
 
@@ -259,19 +285,24 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
             return
 
         self.track_traffic(rx=length)
-        encrypted_body = self.rfile.read(length).decode("utf-8")
 
         try:
+            encrypted_body = self.rfile.read(length).decode("utf-8")
             decrypted_json = SECURITY.decrypt(encrypted_body)
             response_data = json.loads(decrypted_json)
         except Exception:
             self.send_error(400, "Decryption Failed")
             return
 
-        req_id = response_data.get("id")
-        if req_id in PENDING_RESPONSES:
-            PENDING_RESPONSES[req_id]["data"] = response_data
-            PENDING_RESPONSES[req_id]["event"].set()
+        if not valid_tunnel_response(response_data):
+            self.send_error(400, "Malformed Response")
+            return
+
+        req_id = response_data["id"]
+        pending = PENDING_RESPONSES.get(req_id)
+        if pending is not None:
+            pending["data"] = response_data
+            pending["event"].set()
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b"OK")

@@ -97,6 +97,11 @@ The Client executes the request locally (e.g., against `localhost:3000`) and pos
 **Wire Format:**
 The body of the POST request is the raw Encrypted Fernet Token (string).
 
+**Responses:**
+* `200 OK`: The response was delivered to the waiting request.
+* `400 Bad Request`: The body is not valid UTF-8, cannot be decrypted, or is not a response object with a string `id`, an integer `status` from 100 to 599, string `headers` and a base64 `body`.
+* `404 Not Found`: No request with that `id` is waiting.
+
 ---
 
 ## 3. System Events

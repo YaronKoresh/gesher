@@ -170,3 +170,71 @@ class TestServer(unittest.TestCase):
 
         handler.send_error.assert_called_with(400, "Bad Content-Length")
         handler.rfile.read.assert_not_called()
+
+    def _tunnel_response_with_body(self, body_bytes):
+        handler = self.create_mock_handler()
+        event = threading.Event()
+        server.PENDING_RESPONSES["req-1"] = {"event": event, "data": None}
+        auth_header = self.security.get_auth_header()
+        handler.headers.get.side_effect = lambda key, default=None: {
+            "Authorization": auth_header,
+            "Content-Length": str(len(body_bytes)),
+        }.get(key, default)
+        handler.rfile.read.return_value = body_bytes
+        handler.handle_tunnel_response()
+        return handler, event
+
+    def _assert_tunnel_response_rejected(self, handler, event, message):
+        handler.send_error.assert_called_with(400, message)
+        self.assertFalse(event.is_set())
+        self.assertIsNone(server.PENDING_RESPONSES["req-1"]["data"])
+
+    def test_handle_tunnel_response_non_utf8_body(self):
+        handler, event = self._tunnel_response_with_body(b"\xff\xfe\x00")
+
+        self._assert_tunnel_response_rejected(
+            handler, event, "Decryption Failed"
+        )
+
+    def test_handle_tunnel_response_non_object_json(self):
+        for payload in ("[1, 2]", '"text"', "5", "null"):
+            with self.subTest(payload=payload):
+                server.SEEN_SIGNATURES.clear()
+                body = self.security.encrypt(payload).encode("utf-8")
+                handler, event = self._tunnel_response_with_body(body)
+
+                self._assert_tunnel_response_rejected(
+                    handler, event, "Malformed Response"
+                )
+
+    def test_handle_tunnel_response_malformed_fields(self):
+        bad_responses = [
+            {"status": 200, "body": ""},
+            {"id": 7, "status": 200, "body": ""},
+            {"id": "req-1", "status": "abc", "body": ""},
+            {"id": "req-1", "status": True, "body": ""},
+            {"id": "req-1", "status": 99, "body": ""},
+            {"id": "req-1", "status": 600, "body": ""},
+            {"id": "req-1", "status": 200, "headers": [], "body": ""},
+            {"id": "req-1", "status": 200, "headers": {"A": 1}, "body": ""},
+            {"id": "req-1", "status": 200, "body": 5},
+            {"id": "req-1", "status": 200, "body": "not base64!"},
+        ]
+        for data in bad_responses:
+            with self.subTest(data=data):
+                server.SEEN_SIGNATURES.clear()
+                body = self.security.encrypt(json.dumps(data)).encode("utf-8")
+                handler, event = self._tunnel_response_with_body(body)
+
+                self._assert_tunnel_response_rejected(
+                    handler, event, "Malformed Response"
+                )
+
+    def test_handle_tunnel_response_accepts_missing_optional_fields(self):
+        data = {"id": "req-1", "status": 204}
+        body = self.security.encrypt(json.dumps(data)).encode("utf-8")
+
+        handler, event = self._tunnel_response_with_body(body)
+
+        self.assertTrue(event.is_set())
+        handler.wfile.write.assert_called_with(b"OK")
