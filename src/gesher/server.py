@@ -263,9 +263,15 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
             return None
         return length
 
-    def is_chunked_request(self):
+    def transfer_codings(self):
         encoding = self.headers.get("Transfer-Encoding")
-        return isinstance(encoding, str) and "chunked" in encoding.lower()
+        if not isinstance(encoding, str):
+            return []
+        tokens = [t.strip().lower() for t in encoding.split(",")]
+        return [t for t in tokens if t and t != "identity"]
+
+    def is_chunked_request(self):
+        return self.transfer_codings() == ["chunked"]
 
     def read_chunked_body(self):
         body = bytearray()
@@ -588,6 +594,11 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
             target_id = clients[NEXT_CLIENT_INDEX % len(clients)]
             target_queue = CLIENTS[target_id]["queue"]
             NEXT_CLIENT_INDEX += 1
+
+        codings = self.transfer_codings()
+        if codings and codings != ["chunked"]:
+            self.send_error(501, "Unsupported Transfer-Encoding")
+            return
 
         req_id = str(uuid.uuid4())
 
