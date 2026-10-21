@@ -52,6 +52,23 @@ STATS = {
 STATS_LOCK = threading.Lock()
 
 
+DROPPED_RESPONSE_HEADERS = frozenset(
+    [
+        "date",
+        "server",
+        "content-encoding",
+        "content-length",
+        "transfer-encoding",
+        "connection",
+        "keep-alive",
+        "proxy-connection",
+        "te",
+        "trailer",
+        "upgrade",
+    ]
+)
+
+
 def frame_chunk(data):
     return b"%x\r\n" % len(data) + data + b"\r\n"
 
@@ -368,18 +385,19 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
 
             if response_event.wait(timeout=30):
                 resp = PENDING_RESPONSES[req_id]["data"]
-                self.send_response(resp["status"])
+                status = resp["status"]
+                data = (
+                    base64.b64decode(resp["body"]) if resp.get("body") else b""
+                )
+                self.send_response(status)
                 for k, v in resp.get("headers", {}).items():
-                    if k.lower() not in [
-                        "date",
-                        "server",
-                        "content-encoding",
-                        "transfer-encoding",
-                    ]:
+                    if k.lower() not in DROPPED_RESPONSE_HEADERS:
                         self.send_header(k, v)
+                has_body = status >= 200 and status not in (204, 304)
+                if has_body:
+                    self.send_header("Content-Length", str(len(data)))
                 self.end_headers()
-                if resp.get("body"):
-                    data = base64.b64decode(resp["body"])
+                if has_body and data:
                     self.wfile.write(data)
                     self.track_traffic(tx=len(data))
             else:

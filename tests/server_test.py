@@ -260,3 +260,101 @@ class TestServer(unittest.TestCase):
 
         self.assertTrue(first.verify_signature())
         self.assertFalse(second.verify_signature())
+
+    def _public_request_with_response(self, response):
+        handler = self.create_mock_handler()
+        handler.command = "GET"
+        handler.path = "/api/data"
+        handler.headers = MagicMock()
+        handler.headers.get.return_value = "0"
+        handler.headers.__iter__ = MagicMock(return_value=iter([]))
+        handler.headers.items.return_value = []
+        server.CLIENTS["test-client"] = {
+            "queue": queue.Queue(),
+            "address": ("127.0.0.1", 5000),
+        }
+
+        def populate_response(*args, **kwargs):
+            req_id = list(server.PENDING_RESPONSES.keys())[0]
+            server.PENDING_RESPONSES[req_id]["data"] = response
+            return True
+
+        with patch("threading.Event.wait", side_effect=populate_response):
+            handler.handle_public_request()
+        return handler
+
+    def _sent_headers(self, handler):
+        return [
+            (call.args[0].lower(), call.args[1])
+            for call in handler.send_header.call_args_list
+        ]
+
+    def test_public_response_content_length_matches_the_decoded_body(self):
+        body = b"hello world " * 200
+        handler = self._public_request_with_response(
+            {
+                "status": 200,
+                "headers": {
+                    "Content-Encoding": "gzip",
+                    "Content-Length": "52",
+                    "Content-Type": "text/plain",
+                },
+                "body": base64.b64encode(body).decode("utf-8"),
+            }
+        )
+
+        lengths = [
+            v for k, v in self._sent_headers(handler) if k == "content-length"
+        ]
+        self.assertEqual(lengths, [str(len(body))])
+        handler.wfile.write.assert_called_with(body)
+
+    def test_public_response_without_content_length_gets_one(self):
+        handler = self._public_request_with_response(
+            {
+                "status": 200,
+                "headers": {"Transfer-Encoding": "chunked"},
+                "body": base64.b64encode(b"abcdefgh").decode("utf-8"),
+            }
+        )
+
+        sent = self._sent_headers(handler)
+        self.assertIn(("content-length", "8"), sent)
+        self.assertNotIn("transfer-encoding", [k for k, _ in sent])
+
+    def test_public_response_drops_connection_headers(self):
+        handler = self._public_request_with_response(
+            {
+                "status": 200,
+                "headers": {
+                    "Connection": "close",
+                    "Keep-Alive": "timeout=5",
+                    "X-Custom": "kept",
+                },
+                "body": base64.b64encode(b"ok").decode("utf-8"),
+            }
+        )
+
+        names = [k for k, _ in self._sent_headers(handler)]
+        self.assertNotIn("connection", names)
+        self.assertNotIn("keep-alive", names)
+        self.assertIn("x-custom", names)
+
+    def test_public_response_empty_body_has_zero_content_length(self):
+        handler = self._public_request_with_response(
+            {"status": 200, "headers": {}, "body": ""}
+        )
+
+        self.assertIn(("content-length", "0"), self._sent_headers(handler))
+        handler.wfile.write.assert_not_called()
+
+    def test_public_response_204_and_304_have_no_content_length(self):
+        for status in (204, 304):
+            with self.subTest(status=status):
+                handler = self._public_request_with_response(
+                    {"status": status, "headers": {}, "body": ""}
+                )
+
+                names = [k for k, _ in self._sent_headers(handler)]
+                self.assertNotIn("content-length", names)
+                handler.wfile.write.assert_not_called()
