@@ -1,3 +1,5 @@
+import os
+import signal
 import subprocess
 import unittest
 from unittest.mock import MagicMock, patch
@@ -69,6 +71,48 @@ class TestTunnelCleanup(unittest.TestCase):
             cli.main()
         mock_cf.assert_not_called()
         mock_run.assert_called_once()
+
+
+@unittest.skipUnless(hasattr(signal, "SIGTERM"), "no SIGTERM")
+class TestSigtermCleanup(unittest.TestCase):
+    def setUp(self):
+        self.original = signal.getsignal(signal.SIGTERM)
+        self.addCleanup(signal.signal, signal.SIGTERM, self.original)
+
+    @patch("gesher.cli.install_cloudflared")
+    @patch("gesher.cli.start_cloudflared_tunnel")
+    def test_sigterm_stops_the_server_and_the_tunnel(
+        self, mock_cf, mock_install
+    ):
+        proc = MagicMock()
+        proc.poll.return_value = None
+        mock_cf.return_value = (proc, "https://a.trycloudflare.com")
+
+        def serve(port, secret):
+            os.kill(os.getpid(), signal.SIGTERM)
+            raise AssertionError("SIGTERM did not interrupt the server")
+
+        with patch("sys.argv", server_argv()), patch(
+            "gesher.cli.run_server", side_effect=serve
+        ):
+            with self.assertRaises(KeyboardInterrupt):
+                cli.main()
+
+        proc.terminate.assert_called_once()
+
+    @patch("gesher.cli.run_server")
+    def test_previous_sigterm_handler_is_restored(self, mock_run):
+        marker = lambda signum, frame: None
+        signal.signal(signal.SIGTERM, marker)
+
+        with patch("sys.argv", ["gesher", "server", "--secret", "k"]):
+            cli.main()
+
+        self.assertIs(signal.getsignal(signal.SIGTERM), marker)
+
+    def test_handler_turns_sigterm_into_keyboard_interrupt(self):
+        with self.assertRaises(KeyboardInterrupt):
+            cli.raise_interrupt(signal.SIGTERM, None)
 
 
 if __name__ == "__main__":

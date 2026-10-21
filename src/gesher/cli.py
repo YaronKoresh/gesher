@@ -3,6 +3,7 @@ import os
 import platform
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tarfile
@@ -198,6 +199,30 @@ def stop_tunnel(proc):
         pass
 
 
+def raise_interrupt(signum, frame):
+    raise KeyboardInterrupt
+
+
+def route_sigterm_to_interrupt():
+    sigterm = getattr(signal, "SIGTERM", None)
+    if sigterm is None:
+        return None
+    try:
+        return signal.signal(sigterm, raise_interrupt)
+    except ValueError:
+        return None
+
+
+def restore_sigterm(previous):
+    sigterm = getattr(signal, "SIGTERM", None)
+    if sigterm is None or previous is None:
+        return
+    try:
+        signal.signal(sigterm, previous)
+    except ValueError:
+        pass
+
+
 def port_number(value):
     try:
         port = int(value)
@@ -290,6 +315,7 @@ def main():
 
     if args.mode == "server":
         tunnel = None
+        previous_sigterm = route_sigterm_to_interrupt()
         try:
             if args.public:
                 install_cloudflared()
@@ -304,6 +330,7 @@ def main():
             run_server(args.port, args.secret)
         finally:
             stop_tunnel(tunnel)
+            restore_sigterm(previous_sigterm)
     elif args.mode == "client":
         accepted = start_connector(
             args.gateway,

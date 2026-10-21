@@ -87,6 +87,8 @@ Run `gesher --version` to print the installed version.
 
 On Linux the `cloudflared` package is installed with `dpkg` (through `sudo`, unless you run as root); on systems without `dpkg`, install `cloudflared` by hand first.
 
+Stopping the server with Ctrl+C or with SIGTERM also stops the `cloudflared` process it started.
+
 ### Client Mode
 
 | Argument/Flag | Description | Default |
