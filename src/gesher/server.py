@@ -34,6 +34,7 @@ SIGNATURE_LOCK = threading.Lock()
 REQUEST_TIMEOUT = 30
 MAX_CLIENTS = 50
 MAX_BODY_SIZE = 10 * 1024 * 1024
+MAX_CHUNK_LINE = 1024
 RATE_LIMIT_WINDOW = 60
 RATE_LIMIT_MAX_REQ = 100
 IP_REQUEST_COUNTS = collections.defaultdict(list)
@@ -168,6 +169,36 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
             self.send_error(413)
             return None
         return length
+
+    def is_chunked_request(self):
+        encoding = self.headers.get("Transfer-Encoding")
+        return isinstance(encoding, str) and "chunked" in encoding.lower()
+
+    def read_chunked_body(self):
+        body = bytearray()
+        while True:
+            line = self.rfile.readline(MAX_CHUNK_LINE)
+            try:
+                size = int(line.split(b";", 1)[0].strip(), 16)
+            except ValueError:
+                size = -1
+            if size < 0:
+                self.send_error(400, "Bad Chunk Size")
+                return None
+            if size == 0:
+                while True:
+                    trailer = self.rfile.readline(MAX_CHUNK_LINE)
+                    if trailer in (b"\r\n", b"\n", b""):
+                        return bytes(body)
+            if len(body) + size > MAX_BODY_SIZE:
+                self.send_error(413)
+                return None
+            chunk = self.rfile.read(size)
+            if len(chunk) != size:
+                self.send_error(400, "Truncated Chunk")
+                return None
+            body += chunk
+            self.rfile.readline(MAX_CHUNK_LINE)
 
     def check_rate_limit(self):
         client_ip = self.client_address[0]
@@ -437,18 +468,31 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
 
         req_id = str(uuid.uuid4())
 
-        length = self.read_content_length()
-        if length is None:
-            return
+        request_headers = dict(self.headers)
+        if self.is_chunked_request():
+            body_bytes = self.read_chunked_body()
+            if body_bytes is None:
+                return
+            self.track_traffic(rx=len(body_bytes))
+            request_headers = {
+                k: v
+                for k, v in request_headers.items()
+                if k.lower() not in ("transfer-encoding", "content-length")
+            }
+            request_headers["Content-Length"] = str(len(body_bytes))
+        else:
+            length = self.read_content_length()
+            if length is None:
+                return
 
-        self.track_traffic(rx=length)
-        body_bytes = self.rfile.read(length) if length > 0 else b""
+            self.track_traffic(rx=length)
+            body_bytes = self.rfile.read(length) if length > 0 else b""
 
         raw_task = {
             "id": req_id,
             "method": self.command,
             "url": self.path,
-            "headers": dict(self.headers),
+            "headers": request_headers,
             "body": base64.b64encode(body_bytes).decode(),
         }
 

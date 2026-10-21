@@ -69,6 +69,8 @@ The Server sends a JSON object on a new line.
 
 ```
 
+**Request Body:** A public request sent with `Transfer-Encoding: chunked` is read to the end by the Server (up to 10 MB) and forwarded with a plain `Content-Length` instead.
+
 **Request Path:** `url` always starts with `/`. The Server answers `400 Bad Request` to a public request whose path does not, and the Client does not forward such a task: it answers it with a `400` response instead.
 
 **Wire Format:**

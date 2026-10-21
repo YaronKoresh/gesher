@@ -405,3 +405,74 @@ class TestServer(unittest.TestCase):
                 self._assert_tunnel_response_rejected(
                     handler, event, "Malformed Response"
                 )
+
+    def _chunked_request(self, raw_body, headers=None):
+        import io
+
+        handler = self.create_mock_handler()
+        handler.command = "POST"
+        handler.path = "/upload"
+        sent_headers = {"Transfer-Encoding": "chunked", "Host": "x"}
+        sent_headers.update(headers or {})
+        handler.headers = MagicMock()
+        handler.headers.get.side_effect = lambda k, d=None: {
+            key: value for key, value in sent_headers.items()
+        }.get(k, d)
+        handler.headers.items.return_value = list(sent_headers.items())
+        handler.headers.keys.return_value = list(sent_headers.keys())
+        handler.headers.__iter__ = lambda self_: iter(sent_headers)
+        handler.headers.__getitem__ = lambda self_, k: sent_headers[k]
+        handler.rfile = io.BytesIO(raw_body)
+        client_queue = queue.Queue()
+        server.CLIENTS["test-client"] = {
+            "queue": client_queue,
+            "address": ("127.0.0.1", 5000),
+        }
+        with patch("threading.Event.wait", return_value=False):
+            handler.handle_public_request()
+        return handler, client_queue
+
+    def _queued_task(self, client_queue):
+        wrapper = client_queue.get_nowait()
+        return json.loads(self.security.decrypt(wrapper["payload"]))
+
+    def test_chunked_request_body_is_forwarded_whole(self):
+        raw = b"5\r\nhello\r\n6;ext=1\r\n world\r\n0\r\nX-Trailer: 1\r\n\r\n"
+        handler, client_queue = self._chunked_request(raw)
+
+        task = self._queued_task(client_queue)
+
+        self.assertEqual(base64.b64decode(task["body"]), b"hello world")
+        names = [k.lower() for k in task["headers"]]
+        self.assertNotIn("transfer-encoding", names)
+        self.assertEqual(task["headers"]["Content-Length"], "11")
+        self.assertEqual(handler.rfile.read(), b"")
+
+    def test_chunked_request_leaves_the_next_request_untouched(self):
+        raw = b"3\r\nabc\r\n0\r\n\r\nGET /next HTTP/1.1\r\n"
+        handler, client_queue = self._chunked_request(raw)
+
+        task = self._queued_task(client_queue)
+
+        self.assertEqual(base64.b64decode(task["body"]), b"abc")
+        self.assertEqual(handler.rfile.read(), b"GET /next HTTP/1.1\r\n")
+
+    def test_chunked_request_over_the_body_limit_is_rejected(self):
+        size = server.MAX_BODY_SIZE + 1
+        raw = b"%x\r\n" % size
+        handler, client_queue = self._chunked_request(raw)
+
+        handler.send_error.assert_called_with(413)
+        self.assertTrue(client_queue.empty())
+
+    def test_chunked_request_with_bad_size_is_rejected(self):
+        handler, client_queue = self._chunked_request(b"zz\r\nabc\r\n0\r\n\r\n")
+
+        handler.send_error.assert_called_with(400, "Bad Chunk Size")
+        self.assertTrue(client_queue.empty())
+
+    def test_chunked_request_cut_short_is_rejected(self):
+        handler, client_queue = self._chunked_request(b"a\r\nabc")
+
+        handler.send_error.assert_called_with(400, "Truncated Chunk")
+        self.assertTrue(client_queue.empty())
