@@ -42,6 +42,8 @@ IP_LOCK = threading.Lock()
 
 AUTH_FAILURES = collections.defaultdict(list)
 MAX_AUTH_FAILURES = 5
+AUTH_FAILURE_WINDOW = 120
+LAST_RATE_PRUNE = 0.0
 AUTH_LOCKOUT_DURATION = 600
 
 
@@ -91,6 +93,19 @@ DROPPED_RESPONSE_HEADERS = frozenset(
         "upgrade",
     ]
 )
+
+
+def prune_rate_state(now):
+    global LAST_RATE_PRUNE
+    if now - LAST_RATE_PRUNE < RATE_LIMIT_WINDOW:
+        return
+    LAST_RATE_PRUNE = now
+    for ip in list(IP_REQUEST_COUNTS):
+        if not any(now - t < RATE_LIMIT_WINDOW for t in IP_REQUEST_COUNTS[ip]):
+            del IP_REQUEST_COUNTS[ip]
+    for ip in list(AUTH_FAILURES):
+        if not any(now - t < AUTH_FAILURE_WINDOW for t in AUTH_FAILURES[ip]):
+            del AUTH_FAILURES[ip]
 
 
 def frame_chunk(data):
@@ -154,28 +169,32 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
         now = time.time()
 
         with IP_LOCK:
-            timestamps = IP_REQUEST_COUNTS[client_ip]
-            IP_REQUEST_COUNTS[client_ip] = [
-                t for t in timestamps if now - t < RATE_LIMIT_WINDOW
+            prune_rate_state(now)
+
+            timestamps = [
+                t
+                for t in IP_REQUEST_COUNTS.get(client_ip, [])
+                if now - t < RATE_LIMIT_WINDOW
             ]
 
-            if not IP_REQUEST_COUNTS[client_ip]:
-                del IP_REQUEST_COUNTS[client_ip]
-                IP_REQUEST_COUNTS[client_ip] = []
-
-            if len(IP_REQUEST_COUNTS[client_ip]) >= RATE_LIMIT_MAX_REQ:
+            if len(timestamps) >= RATE_LIMIT_MAX_REQ:
+                IP_REQUEST_COUNTS[client_ip] = timestamps
                 return False
 
-            IP_REQUEST_COUNTS[client_ip].append(now)
+            timestamps.append(now)
+            IP_REQUEST_COUNTS[client_ip] = timestamps
 
-            failures = AUTH_FAILURES[client_ip]
-            AUTH_FAILURES[client_ip] = [t for t in failures if now - t < 120]
+            failures = [
+                t
+                for t in AUTH_FAILURES.get(client_ip, [])
+                if now - t < AUTH_FAILURE_WINDOW
+            ]
+            if failures:
+                AUTH_FAILURES[client_ip] = failures
+            else:
+                AUTH_FAILURES.pop(client_ip, None)
 
-            if not AUTH_FAILURES[client_ip]:
-                del AUTH_FAILURES[client_ip]
-                AUTH_FAILURES[client_ip] = []
-
-            if len(AUTH_FAILURES[client_ip]) >= MAX_AUTH_FAILURES:
+            if len(failures) >= MAX_AUTH_FAILURES:
                 return False
 
             return True
