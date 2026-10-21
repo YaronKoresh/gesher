@@ -20,6 +20,8 @@ SECURITY = None
 LOCAL_CONNECT_TIMEOUT = 5
 LOCAL_READ_TIMEOUT = 25
 GATEWAY_POST_TIMEOUT = 15
+TUNNEL_CONNECT_TIMEOUT = 10
+TUNNEL_READ_TIMEOUT = 45
 
 DASHBOARD_HTML = """
 <!DOCTYPE html>
@@ -334,7 +336,7 @@ def start_connector(gateway_url, secret, local_target, pin, dashboard_port):
                     "X-Join-Code": pin,
                 },
                 stream=True,
-                timeout=None,
+                timeout=(TUNNEL_CONNECT_TIMEOUT, TUNNEL_READ_TIMEOUT),
             ) as r:
                 if r.status_code == 401:
                     logger.critical("⛔ Gatekeeper Rejected: Invalid PIN.")

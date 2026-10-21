@@ -42,6 +42,13 @@ class TestDocsMatchCode(unittest.TestCase):
             f"maximum of {server.MAX_CLIENTS} connected", read("protocol.md")
         )
 
+    def test_keepalive_numbers_match_the_code(self):
+        from gesher import client
+
+        text = read("protocol.md")
+        self.assertIn(f"every {server.KEEPALIVE_INTERVAL} seconds", text)
+        self.assertIn(f"after {client.TUNNEL_READ_TIMEOUT} seconds", text)
+
     def test_replay_window_matches_the_signature_window(self):
         import inspect
 

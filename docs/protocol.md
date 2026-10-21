@@ -39,6 +39,7 @@ The Client initiates a long-lived HTTP POST request to establish the tunnel.
 * **Content-Type:** `application/x-ndjson` (Newline Delimited JSON)
 * **Transfer-Encoding:** `chunked`. Every Task is sent as its own chunk, so the Client receives it as soon as it is sent, whatever its size.
 * **Body:** An infinite stream of JSON objects. Each line is a "Task".
+* **Keepalive:** While no Task is sent, the Server writes an empty line every 15 seconds. The Client ignores empty lines and drops the connection and reconnects after 45 seconds of silence.
 
 **Response (Failure):**
 * `401 Unauthorized`: Invalid PIN.

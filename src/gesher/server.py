@@ -63,6 +63,7 @@ STATS_LOCK = threading.Lock()
 
 
 DISCONNECT_CHECK_INTERVAL = 0.5
+KEEPALIVE_INTERVAL = 15
 
 
 class SystemTask(dict):
@@ -417,6 +418,7 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
 
         pending = None
+        last_write = time.monotonic()
         try:
             while True:
                 try:
@@ -424,6 +426,10 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
                 except queue.Empty:
                     if self.client_disconnected():
                         break
+                    if time.monotonic() - last_write >= KEEPALIVE_INTERVAL:
+                        self.wfile.write(frame_chunk(b"\n"))
+                        self.wfile.flush()
+                        last_write = time.monotonic()
                     continue
                 pending = task
                 if self.client_disconnected():
@@ -433,6 +439,7 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
                 self.wfile.write(frame_chunk(data))
                 self.wfile.flush()
                 self.track_traffic(tx=len(data))
+                last_write = time.monotonic()
                 pending = None
         except Exception:
             pass
