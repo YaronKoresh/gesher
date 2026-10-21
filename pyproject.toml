@@ -27,27 +27,19 @@ license-files = ["LICENSE"]
 keywords = ["repository", "tunneling", "networking"]
 dependencies = [
     "requests",
-    "fastapi",
-    "uvicorn[standard]",
     "cryptography"
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest",
-    "pytest-asyncio",
     "pytest-cov",
-    "pytest-mock",
-    "hypothesis",
-    "expecttest",
     "ruff",
     "poethepoet",
     "pre-commit",
     "build",
-    "pydantic",
     "mypy",
-    "vulture",
-    "websockets"
+    "vulture"
 ]
 
 [project.scripts]
@@ -70,9 +62,6 @@ testpaths = [
 ]
 pythonpath = [
     "src",
-]
-markers = [
-    "asyncio: marks async tests",
 ]
 
 # --- RUFF CONFIGURATION ---
@@ -114,7 +103,7 @@ indent-style = "space"
 # --- POE TASKS ---
 [tool.poe.tasks]
 # Project Development
-dev = "uvicorn gesher.server:app --reload"
+dev = "python -m gesher server --secret dev-secret --port 8000"
 
 # Quality Assurance
 check = ["clean", "compile", "dead-code", "strip-comments", "pre-commit", "test", "clean"]
