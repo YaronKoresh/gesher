@@ -56,6 +56,20 @@ class TestRateLimitState(unittest.TestCase):
             self.check("10.3.0.1", 3000.0 + server.RATE_LIMIT_WINDOW + 1)
         )
 
+    def test_no_unused_lockout_constant_contradicts_the_real_window(self):
+        self.assertFalse(hasattr(server, "AUTH_LOCKOUT_DURATION"))
+
+    def test_lockout_ends_with_the_failure_window(self):
+        with patch("gesher.server.time.time", return_value=8000.0):
+            for _ in range(server.MAX_AUTH_FAILURES):
+                handler_for("10.5.0.1").record_auth_failure()
+        self.assertFalse(
+            self.check("10.5.0.1", 8000.0 + server.AUTH_FAILURE_WINDOW - 1)
+        )
+        self.assertTrue(
+            self.check("10.5.0.1", 8000.0 + server.AUTH_FAILURE_WINDOW + 1)
+        )
+
     def test_auth_failures_still_block_and_then_release(self):
         with patch("gesher.server.time.time", return_value=4000.0):
             for _ in range(server.MAX_AUTH_FAILURES):
