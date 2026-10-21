@@ -4,6 +4,7 @@ import json
 import logging
 import threading
 import time
+import urllib.parse
 
 import requests
 
@@ -24,6 +25,7 @@ DASHBOARD_HTML = """
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8">
     <title>Gesher Local Monitor</title>
     <style>
         body { font-family: sans-serif; background: #111; color: #eee; padding: 20px; }
@@ -120,13 +122,14 @@ def run_local_dashboard(port, gateway_url, pin):
             if not is_local_host_header(self.headers.get("Host")):
                 self.send_error(403)
                 return
-            if self.path == "/":
+            route = urllib.parse.urlsplit(self.path).path
+            if route == "/":
                 self.send_response(200)
-                self.send_header("Content-Type", "text/html")
+                self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.end_headers()
                 self.wfile.write(DASHBOARD_HTML.encode())
 
-            elif self.path == "/api/stats":
+            elif route == "/api/stats":
                 try:
                     resp = requests.post(
                         f"{gateway_url}/_sys/sync_stats",
@@ -139,7 +142,9 @@ def run_local_dashboard(port, gateway_url, pin):
                     if resp.status_code == 200:
                         decrypted_json = SECURITY.decrypt(resp.text)
                         self.send_response(200)
-                        self.send_header("Content-Type", "application/json")
+                        self.send_header(
+                            "Content-Type", "application/json; charset=utf-8"
+                        )
                         self.end_headers()
                         self.wfile.write(decrypted_json.encode())
                     else:
