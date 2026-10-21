@@ -182,6 +182,11 @@ class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
 class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     timeout = REQUEST_TIMEOUT
+    server_version = "gesher"
+    sys_version = ""
+
+    def version_string(self):
+        return self.server_version
 
     def log_request(self, code="-", size="-"):
         _junk = [code, size]
