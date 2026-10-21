@@ -142,6 +142,13 @@ def drop_connection_headers(headers):
     return {k: v for k, v in headers.items() if k.lower() not in dropped}
 
 
+def encode_raw_path(path):
+    return "".join(
+        char if ord(char) < 128 else "%{:02X}".format(ord(char) & 0xFF)
+        for char in path
+    )
+
+
 def merge_repeated_headers(headers):
     result = {}
     names = {}
@@ -603,7 +610,7 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
         raw_task = {
             "id": req_id,
             "method": self.command,
-            "url": self.path,
+            "url": encode_raw_path(self.path),
             "headers": request_headers,
             "body": base64.b64encode(body_bytes).decode(),
         }
