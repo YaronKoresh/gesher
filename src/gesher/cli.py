@@ -5,6 +5,7 @@ import re
 import subprocess
 import tarfile
 import time
+import urllib.parse
 import urllib.request
 
 from .client import start_connector
@@ -122,6 +123,35 @@ def start_cloudflared_tunnel(port):
                 return proc, None
 
 
+def port_number(value):
+    try:
+        port = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            f"'{value}' is not a port number"
+        ) from None
+    if not 1 <= port <= 65535:
+        raise argparse.ArgumentTypeError(
+            f"{port} is outside the port range 1-65535"
+        )
+    return port
+
+
+def non_empty(value):
+    if not value.strip():
+        raise argparse.ArgumentTypeError("must not be empty")
+    return value
+
+
+def http_url(value):
+    parts = urllib.parse.urlsplit(value)
+    if parts.scheme not in ("http", "https") or not parts.netloc:
+        raise argparse.ArgumentTypeError(
+            f"'{value}' must start with http:// or https:// and name a host"
+        )
+    return value
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="gesher", description="Gesher: Secure HTTP Tunneling"
@@ -132,35 +162,35 @@ def main():
         "server", help="Run the Remote Bridge Server"
     )
     server_p.add_argument(
-        "--secret", type=str, required=True, help="Auth secret"
+        "--secret", type=non_empty, required=True, help="Auth secret"
     )
-    server_p.add_argument("--port", type=int, default=8000)
+    server_p.add_argument("--port", type=port_number, default=8000)
     server_p.add_argument(
         "--public", action="store_true", help="Auto-start Cloudflare tunnel"
     )
 
     client_p = subparsers.add_parser("client", help="Run the Local Connector")
     client_p.add_argument(
-        "--gateway", type=str, required=True, help="The public Bridge URL"
+        "--gateway", type=http_url, required=True, help="The public Bridge URL"
     )
     client_p.add_argument(
-        "--secret", type=str, required=True, help="The Auth Secret"
+        "--secret", type=non_empty, required=True, help="The Auth Secret"
     )
     client_p.add_argument(
         "--pin",
-        type=str,
+        type=non_empty,
         required=True,
         help="The Gatekeeper PIN shown on the server",
     )
     client_p.add_argument(
         "--target",
-        type=str,
+        type=http_url,
         default="http://localhost:8080",
         help="Local service URL",
     )
     client_p.add_argument(
         "--dashboard-port",
-        type=int,
+        type=port_number,
         default=9000,
         help="Port for local stats dashboard",
     )
