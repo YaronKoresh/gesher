@@ -39,6 +39,7 @@ dev = [
     "pre-commit",
     "build",
     "mypy",
+    "types-requests",
     "vulture"
 ]
 

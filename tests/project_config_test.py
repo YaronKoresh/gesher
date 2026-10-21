@@ -27,6 +27,14 @@ class TestProjectConfig(unittest.TestCase):
                 pattern = rf"^(?:import|from) {re.escape(name)}\b"
                 self.assertTrue(re.search(pattern, source, re.M), name)
 
+    def test_dev_extras_include_the_type_stubs_of_typed_imports(self):
+        extras = self.text.split("[project.optional-dependencies]", 1)[1]
+        dev = re.search(r"dev = \[(.*?)\n\]", extras, re.S)
+        self.assertIsNotNone(dev)
+        names = re.findall(r'"([^"]+)"', dev.group(1))
+        self.assertIn("mypy", names)
+        self.assertIn("types-requests", names)
+
     def test_dev_task_points_at_an_existing_entry_point(self):
         match = re.search(r'^dev = "([^"]+)"', self.text, re.M)
         self.assertIsNotNone(match)

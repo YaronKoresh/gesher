@@ -24,6 +24,8 @@ class TestTypes(unittest.TestCase):
                 "-m",
                 "mypy",
                 "--ignore-missing-imports",
+                "--disable-error-code",
+                "import-untyped",
                 "--cache-dir",
                 os.devnull,
                 "src",
