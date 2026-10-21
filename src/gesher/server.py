@@ -126,6 +126,11 @@ def valid_tunnel_response(data):
     for key, value in headers.items():
         if not isinstance(key, str) or not isinstance(value, str):
             return False
+    cookies = data.get("set_cookies", [])
+    if not isinstance(cookies, list):
+        return False
+    if not all(isinstance(c, str) for c in cookies):
+        return False
     body = data.get("body", "")
     if body is None or body == "":
         return True
@@ -468,6 +473,8 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
                 for k, v in resp.get("headers", {}).items():
                     if k.lower() not in DROPPED_RESPONSE_HEADERS:
                         self.send_header(k, v)
+                for cookie in resp.get("set_cookies", []):
+                    self.send_header("Set-Cookie", cookie)
                 has_body = status >= 200 and status not in (204, 304)
                 if has_body:
                     self.send_header("Content-Length", str(len(data)))

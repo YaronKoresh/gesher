@@ -205,3 +205,50 @@ class TestClient(unittest.TestCase):
                     mock_request.call_args.kwargs["url"],
                     f"http://localhost:8080{url}",
                 )
+
+    @patch("gesher.client.requests.post")
+    @patch("gesher.client.requests.request")
+    def test_handle_task_keeps_every_set_cookie_header(
+        self, mock_request, mock_post
+    ):
+        task_data = {"id": "55", "method": "GET", "url": "/login"}
+        encrypted = self.security.encrypt(json.dumps(task_data))
+        mock_local_resp = MagicMock()
+        mock_local_resp.status_code = 200
+        mock_local_resp.headers = {
+            "Set-Cookie": "a=1, b=2",
+            "Content-Type": "text/plain",
+        }
+        mock_local_resp.content = b""
+        mock_local_resp.raw.headers.getlist.return_value = ["a=1", "b=2"]
+        mock_request.return_value = mock_local_resp
+
+        client.handle_task(encrypted, "http://localhost:8080", "http://gw")
+
+        sent = json.loads(
+            self.security.decrypt(mock_post.call_args.kwargs["data"])
+        )
+        self.assertEqual(sent["set_cookies"], ["a=1", "b=2"])
+        self.assertEqual(sent["headers"], {"Content-Type": "text/plain"})
+
+    @patch("gesher.client.requests.post")
+    @patch("gesher.client.requests.request")
+    def test_handle_task_without_cookies_keeps_plain_headers(
+        self, mock_request, mock_post
+    ):
+        task_data = {"id": "56", "method": "GET", "url": "/"}
+        encrypted = self.security.encrypt(json.dumps(task_data))
+        mock_local_resp = MagicMock()
+        mock_local_resp.status_code = 200
+        mock_local_resp.headers = {"X-A": "1"}
+        mock_local_resp.content = b""
+        mock_local_resp.raw.headers.getlist.return_value = []
+        mock_request.return_value = mock_local_resp
+
+        client.handle_task(encrypted, "http://localhost:8080", "http://gw")
+
+        sent = json.loads(
+            self.security.decrypt(mock_post.call_args.kwargs["data"])
+        )
+        self.assertNotIn("set_cookies", sent)
+        self.assertEqual(sent["headers"], {"X-A": "1"})

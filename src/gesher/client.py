@@ -135,13 +135,30 @@ def is_valid_task_url(url):
     return not any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in url)
 
 
-def post_gateway_response(gateway_url, task_id, status, headers, content):
+def response_set_cookies(resp):
+    try:
+        values = resp.raw.headers.getlist("Set-Cookie")
+    except Exception:
+        return []
+    if not isinstance(values, list):
+        return []
+    return [v for v in values if isinstance(v, str)]
+
+
+def post_gateway_response(
+    gateway_url, task_id, status, headers, content, set_cookies=None
+):
     response_data = {
         "id": task_id,
         "status": status,
         "headers": headers,
         "body": base64.b64encode(content).decode("utf-8"),
     }
+    if set_cookies:
+        response_data["headers"] = {
+            k: v for k, v in headers.items() if k.lower() != "set-cookie"
+        }
+        response_data["set_cookies"] = set_cookies
 
     encrypted_response = SECURITY.encrypt(json.dumps(response_data))
 
@@ -219,6 +236,7 @@ def handle_task(encrypted_payload, local_target, gateway_url):
             resp.status_code,
             dict(resp.headers),
             resp.content,
+            response_set_cookies(resp),
         )
         logger.info("📤 Response Sent (Encrypted)")
 

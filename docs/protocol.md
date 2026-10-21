@@ -94,7 +94,8 @@ The Client executes the request locally (e.g., against `localhost:3000`) and pos
     "Content-Type": "application/json",
     "Server": "MyLocalApp"
   },
-  "body": "base64_encoded_response_content"
+  "body": "base64_encoded_response_content",
+  "set_cookies": ["a=1; Path=/", "b=2; Path=/"] // Optional, every Set-Cookie header of the response
 }
 
 ```

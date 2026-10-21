@@ -374,3 +374,34 @@ class TestServer(unittest.TestCase):
                 handler.send_error.assert_called_with(400, "Bad Request Target")
                 self.assertTrue(server.CLIENTS["test-client"]["queue"].empty())
                 self.assertEqual(server.PENDING_RESPONSES, {})
+
+    def test_public_response_sends_each_set_cookie_separately(self):
+        handler = self._public_request_with_response(
+            {
+                "status": 200,
+                "headers": {"Content-Type": "text/plain"},
+                "set_cookies": ["a=1; Path=/", "b=2; Path=/"],
+                "body": base64.b64encode(b"ok").decode("utf-8"),
+            }
+        )
+
+        sent = self._sent_headers(handler)
+        cookies = [v for k, v in sent if k == "set-cookie"]
+        self.assertEqual(cookies, ["a=1; Path=/", "b=2; Path=/"])
+
+    def test_tunnel_response_rejects_malformed_set_cookies(self):
+        for cookies in ("a=1", [1], {"a": "1"}):
+            with self.subTest(cookies=cookies):
+                server.SEEN_SIGNATURES.clear()
+                data = {
+                    "id": "req-1",
+                    "status": 200,
+                    "set_cookies": cookies,
+                    "body": "",
+                }
+                body = self.security.encrypt(json.dumps(data)).encode("utf-8")
+                handler, event = self._tunnel_response_with_body(body)
+
+                self._assert_tunnel_response_rejected(
+                    handler, event, "Malformed Response"
+                )
