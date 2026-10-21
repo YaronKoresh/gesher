@@ -70,6 +70,26 @@ class SystemTask(dict):
     pass
 
 
+class PublicTask(dict):
+    def __init__(self, *args, req_id=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.req_id = req_id
+
+
+def reject_task(task):
+    req_id = getattr(task, "req_id", None)
+    pending = PENDING_RESPONSES.get(req_id) if req_id else None
+    if pending is None:
+        return
+    pending["data"] = {
+        "id": req_id,
+        "status": 503,
+        "headers": {"Content-Type": "text/plain"},
+        "body": base64.b64encode(b"No Secure Agents Online").decode(),
+    }
+    pending["event"].set()
+
+
 def redistribute_task(task):
     global NEXT_CLIENT_INDEX
     if isinstance(task, SystemTask):
@@ -77,6 +97,7 @@ def redistribute_task(task):
     with CLIENT_LOCK:
         queues = [data["queue"] for data in CLIENTS.values()]
         if not queues:
+            reject_task(task)
             return False
         target = queues[NEXT_CLIENT_INDEX % len(queues)]
         NEXT_CLIENT_INDEX += 1
@@ -645,7 +666,7 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
         PENDING_RESPONSES[req_id] = {"event": response_event, "data": None}
 
         try:
-            target_queue.put({"payload": encrypted_task})
+            target_queue.put(PublicTask(payload=encrypted_task, req_id=req_id))
 
             if response_event.wait(timeout=30):
                 resp = PENDING_RESPONSES[req_id]["data"]
