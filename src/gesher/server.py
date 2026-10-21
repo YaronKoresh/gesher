@@ -52,6 +52,10 @@ STATS = {
 STATS_LOCK = threading.Lock()
 
 
+def frame_chunk(data):
+    return b"%x\r\n" % len(data) + data + b"\r\n"
+
+
 def valid_tunnel_response(data):
     if not isinstance(data, dict) or not isinstance(data.get("id"), str):
         return False
@@ -255,6 +259,7 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
 
         self.send_response(200)
         self.send_header("Content-Type", "application/x-ndjson")
+        self.send_header("Transfer-Encoding", "chunked")
         self.send_header("X-Client-ID", client_id)
         self.end_headers()
 
@@ -263,7 +268,7 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
                 task = client_queue.get()
                 json_str = json.dumps(task) + "\n"
                 data = json_str.encode("utf-8")
-                self.wfile.write(data)
+                self.wfile.write(frame_chunk(data))
                 self.wfile.flush()
                 self.track_traffic(tx=len(data))
         except Exception:
