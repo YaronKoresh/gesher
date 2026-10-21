@@ -117,6 +117,7 @@ If the local service cannot be reached the Client answers with status `502`, and
 * `200 OK`: The response was delivered to the waiting request.
 * `400 Bad Request`: The body is not valid UTF-8, cannot be decrypted, or is not a response object with a string `id`, an integer `status` from 100 to 599, string `headers` and a base64 `body`.
 * `404 Not Found`: No request with that `id` is waiting.
+* `413 Request Entity Too Large`: The encrypted body is larger than 10 MB (a local response of about 5 MB or more). The Client then answers the public request with a `502` response instead.
 
 ---
 

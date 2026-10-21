@@ -47,6 +47,12 @@ class TestDocsMatchCode(unittest.TestCase):
         self.assertIn("`Upgrade` header", text)
         self.assertIn("`501`", text)
 
+    def test_oversized_response_handling_is_documented(self):
+        text = read("protocol.md")
+        self.assertIn("`413 Request Entity Too Large`", text)
+        self.assertEqual(server.MAX_BODY_SIZE, 10 * 1024 * 1024)
+        self.assertIn("larger than 10 MB", text)
+
     def test_keepalive_numbers_match_the_code(self):
         from gesher import client
 
