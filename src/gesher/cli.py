@@ -130,6 +130,17 @@ def install_cloudflared_macos(url):
     subprocess.run(["sudo", "mv", "cloudflared", "/usr/local/bin/"], check=True)
 
 
+TUNNEL_URL_PATTERN = re.compile(r"https://([\w-]+)\.trycloudflare\.com")
+NON_TUNNEL_HOSTS = frozenset(["api"])
+
+
+def find_tunnel_url(log_text):
+    for match in TUNNEL_URL_PATTERN.finditer(log_text):
+        if match.group(1).lower() not in NON_TUNNEL_HOSTS:
+            return match.group(0)
+    return None
+
+
 def start_cloudflared_tunnel(port):
     cf_bin = cloudflared_binary()
 
@@ -148,9 +159,9 @@ def start_cloudflared_tunnel(port):
             time.sleep(TUNNEL_POLL_INTERVAL)
             with open("tunnel.log") as f:
                 content = f.read()
-            match = re.search(r"https://[\w-]+\.trycloudflare\.com", content)
-            if match:
-                return proc, match.group(0)
+            url = find_tunnel_url(content)
+            if url:
+                return proc, url
             if proc.poll() is not None or time.time() >= deadline:
                 return proc, None
 
