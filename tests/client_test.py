@@ -252,3 +252,48 @@ class TestClient(unittest.TestCase):
         )
         self.assertNotIn("set_cookies", sent)
         self.assertEqual(sent["headers"], {"X-A": "1"})
+
+
+class TestLocalDashboardThreading(unittest.TestCase):
+    def test_slow_stats_request_does_not_block_the_page(self):
+        import socket
+        import threading
+        import time
+
+        client.SECURITY = SecurityLayer("dash-secret")
+        silent = socket.socket()
+        silent.bind(("127.0.0.1", 0))
+        silent.listen(5)
+        gateway = f"http://127.0.0.1:{silent.getsockname()[1]}"
+        probe = socket.socket()
+        probe.bind(("127.0.0.1", 0))
+        dash_port = probe.getsockname()[1]
+        probe.close()
+
+        threading.Thread(
+            target=client.run_local_dashboard,
+            args=(dash_port, gateway, "PIN"),
+            daemon=True,
+        ).start()
+        base = f"http://localhost:{dash_port}"
+        for _ in range(100):
+            try:
+                requests.get(f"{base}/", timeout=1)
+                break
+            except requests.exceptions.ConnectionError:
+                time.sleep(0.05)
+
+        slow = threading.Thread(
+            target=lambda: requests.get(f"{base}/api/stats", timeout=10),
+            daemon=True,
+        )
+        slow.start()
+        time.sleep(0.5)
+
+        started = time.time()
+        page = requests.get(f"{base}/", timeout=10)
+        elapsed = time.time() - started
+
+        silent.close()
+        self.assertEqual(page.status_code, 200)
+        self.assertLess(elapsed, 2.0)

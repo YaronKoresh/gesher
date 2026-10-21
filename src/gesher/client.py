@@ -124,9 +124,11 @@ def run_local_dashboard(port, gateway_url, pin):
                 self.send_error(404)
 
     logger.info(f"📊 Local Dashboard running at http://localhost:{port}")
-    http.server.HTTPServer(
+    server = http.server.ThreadingHTTPServer(
         ("localhost", port), LocalDashHandler
-    ).serve_forever()
+    )
+    server.daemon_threads = True
+    server.serve_forever()
 
 
 def is_valid_task_url(url):
