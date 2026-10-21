@@ -42,6 +42,11 @@ class TestDocsMatchCode(unittest.TestCase):
             f"maximum of {server.MAX_CLIENTS} connected", read("protocol.md")
         )
 
+    def test_upgrade_requests_are_documented_as_refused(self):
+        text = read("protocol.md")
+        self.assertIn("`Upgrade` header", text)
+        self.assertIn("`501`", text)
+
     def test_keepalive_numbers_match_the_code(self):
         from gesher import client
 

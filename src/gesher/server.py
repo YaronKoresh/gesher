@@ -515,6 +515,11 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
             self.send_error(400, "Bad Request Target")
             return
 
+        upgrade = self.headers.get("Upgrade")
+        if isinstance(upgrade, str) and upgrade.strip():
+            self.send_error(501, "Upgrade Not Supported")
+            return
+
         global NEXT_CLIENT_INDEX
         target_queue = None
 

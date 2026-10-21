@@ -88,7 +88,9 @@ class TestServer(unittest.TestCase):
         handler.command = "GET"
         handler.path = "/api/data"
         handler.headers = MagicMock()
-        handler.headers.get.return_value = "0"
+        handler.headers.get.side_effect = lambda key, default=None: (
+            "0" if key == "Content-Length" else default
+        )
         handler.headers.__iter__ = MagicMock(return_value=iter([]))
 
         client_queue = queue.Queue()
@@ -107,7 +109,9 @@ class TestServer(unittest.TestCase):
         handler.command = "GET"
         handler.path = "/api/data"
         handler.headers = MagicMock()
-        handler.headers.get.return_value = "0"
+        handler.headers.get.side_effect = lambda key, default=None: (
+            "0" if key == "Content-Length" else default
+        )
         handler.headers.__iter__ = MagicMock(return_value=iter([]))
         handler.headers.items.return_value = []
 
@@ -266,7 +270,9 @@ class TestServer(unittest.TestCase):
         handler.command = "GET"
         handler.path = "/api/data"
         handler.headers = MagicMock()
-        handler.headers.get.return_value = "0"
+        handler.headers.get.side_effect = lambda key, default=None: (
+            "0" if key == "Content-Length" else default
+        )
         handler.headers.__iter__ = MagicMock(return_value=iter([]))
         handler.headers.items.return_value = []
         server.CLIENTS["test-client"] = {
