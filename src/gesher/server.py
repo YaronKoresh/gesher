@@ -26,11 +26,11 @@ logger = logging.getLogger("BridgeServer")
 GATEKEEPER_PIN = None
 SHARED_SECRET = None
 SECURITY = None
-CLIENTS = {}
+CLIENTS: dict = {}
 CLIENT_LOCK = threading.Lock()
 NEXT_CLIENT_INDEX = 0
-PENDING_RESPONSES = {}
-SEEN_SIGNATURES = {}
+PENDING_RESPONSES: dict = {}
+SEEN_SIGNATURES: dict = {}
 SIGNATURE_LOCK = threading.Lock()
 SEEN_SIGNATURE_TTL = 2 * SIGNATURE_WINDOW_SECONDS + 2
 
@@ -42,11 +42,11 @@ MAX_CHUNK_LINE = 1024
 HEX_DIGITS = frozenset(b"0123456789abcdefABCDEF")
 RATE_LIMIT_WINDOW = 60
 RATE_LIMIT_MAX_REQ = 100
-IP_REQUEST_COUNTS = collections.defaultdict(list)
+IP_REQUEST_COUNTS: dict = collections.defaultdict(list)
 IP_LOCK = threading.Lock()
 
 
-AUTH_FAILURES = collections.defaultdict(list)
+AUTH_FAILURES: dict = collections.defaultdict(list)
 MAX_AUTH_FAILURES = 5
 AUTH_FAILURE_WINDOW = 120
 LAST_RATE_PRUNE = 0.0

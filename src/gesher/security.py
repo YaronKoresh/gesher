@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import secrets
 import time
+from typing import Optional, Tuple
 
 from cryptography.fernet import Fernet
 
@@ -39,7 +40,7 @@ class SecurityLayer:
 
     def verify_signature(
         self, auth_header: str, window_seconds: int = SIGNATURE_WINDOW_SECONDS
-    ) -> bool:
+    ) -> Tuple[bool, Optional[str]]:
         if not auth_header or ":" not in auth_header:
             return False, None
 
