@@ -6,6 +6,8 @@ import time
 
 from cryptography.fernet import Fernet
 
+SIGNATURE_WINDOW_SECONDS = 30
+
 
 class SecurityLayer:
     def __init__(self, secret: str):
@@ -36,7 +38,7 @@ class SecurityLayer:
         return f"{timestamp}:{nonce}.{signature}"
 
     def verify_signature(
-        self, auth_header: str, window_seconds: int = 30
+        self, auth_header: str, window_seconds: int = SIGNATURE_WINDOW_SECONDS
     ) -> bool:
         if not auth_header or ":" not in auth_header:
             return False, None

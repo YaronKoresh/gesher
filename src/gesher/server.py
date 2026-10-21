@@ -14,7 +14,7 @@ import threading
 import time
 import uuid
 
-from .security import SecurityLayer
+from .security import SIGNATURE_WINDOW_SECONDS, SecurityLayer
 
 logging.basicConfig(
     level=logging.INFO, format="[%(asctime)s] [%(levelname)s] %(message)s"
@@ -31,6 +31,7 @@ NEXT_CLIENT_INDEX = 0
 PENDING_RESPONSES = {}
 SEEN_SIGNATURES = {}
 SIGNATURE_LOCK = threading.Lock()
+SEEN_SIGNATURE_TTL = 2 * SIGNATURE_WINDOW_SECONDS + 2
 
 
 REQUEST_TIMEOUT = 30
@@ -328,7 +329,9 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
         current_time = int(time.time())
         with SIGNATURE_LOCK:
             keys_to_delete = [
-                k for k, t in SEEN_SIGNATURES.items() if current_time - t > 35
+                k
+                for k, t in SEEN_SIGNATURES.items()
+                if current_time - t > SEEN_SIGNATURE_TTL
             ]
             for k in keys_to_delete:
                 del SEEN_SIGNATURES[k]
