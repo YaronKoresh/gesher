@@ -113,6 +113,35 @@ def prune_rate_state(now):
             del AUTH_FAILURES[ip]
 
 
+HOP_BY_HOP_REQUEST_HEADERS = frozenset(
+    [
+        "connection",
+        "keep-alive",
+        "proxy-connection",
+        "proxy-authorization",
+        "te",
+        "trailer",
+        "upgrade",
+        "expect",
+    ]
+)
+
+
+def drop_connection_headers(headers):
+    named = set()
+    for key, value in headers.items():
+        if key.lower() == "connection":
+            named.update(
+                token.strip().lower()
+                for token in value.split(",")
+                if token.strip()
+            )
+    named.discard("host")
+    named.discard("content-length")
+    dropped = HOP_BY_HOP_REQUEST_HEADERS | named
+    return {k: v for k, v in headers.items() if k.lower() not in dropped}
+
+
 def merge_repeated_headers(headers):
     result = {}
     names = {}
@@ -549,7 +578,8 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
         req_id = str(uuid.uuid4())
 
         request_headers = with_forwarded_for(
-            merge_repeated_headers(self.headers), self.remote_ip()
+            drop_connection_headers(merge_repeated_headers(self.headers)),
+            self.remote_ip(),
         )
         if self.is_chunked_request():
             body_bytes = self.read_chunked_body()
