@@ -86,6 +86,29 @@ DASHBOARD_HTML = """
 """
 
 
+LOCAL_HOST_NAMES = frozenset(["localhost", "127.0.0.1", "::1"])
+
+
+def is_local_host_header(value):
+    if value is None:
+        return True
+    if not isinstance(value, str):
+        return False
+    host = value.strip().lower()
+    if host.startswith("["):
+        end = host.find("]")
+        if end < 0:
+            return False
+        name, rest = host[1:end], host[end + 1 :]
+        if rest and not (rest.startswith(":") and rest[1:].isdigit()):
+            return False
+    else:
+        name, _, port = host.partition(":")
+        if port and not port.isdigit():
+            return False
+    return name in LOCAL_HOST_NAMES
+
+
 def run_local_dashboard(port, gateway_url, pin):
 
     class LocalDashHandler(http.server.BaseHTTPRequestHandler):
@@ -94,6 +117,9 @@ def run_local_dashboard(port, gateway_url, pin):
             return
 
         def do_GET(self):
+            if not is_local_host_header(self.headers.get("Host")):
+                self.send_error(403)
+                return
             if self.path == "/":
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html")
