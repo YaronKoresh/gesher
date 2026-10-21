@@ -113,6 +113,21 @@ def prune_rate_state(now):
             del AUTH_FAILURES[ip]
 
 
+def merge_repeated_headers(headers):
+    result = {}
+    names = {}
+    for key, value in headers.items():
+        lowered = key.lower()
+        if lowered not in names:
+            names[lowered] = key
+            result[key] = value
+            continue
+        first = names[lowered]
+        separator = "; " if lowered == "cookie" else ", "
+        result[first] = f"{result[first]}{separator}{value}"
+    return result
+
+
 def with_forwarded_for(headers, address):
     name = "X-Forwarded-For"
     existing = None
@@ -534,7 +549,7 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
         req_id = str(uuid.uuid4())
 
         request_headers = with_forwarded_for(
-            dict(self.headers), self.remote_ip()
+            merge_repeated_headers(self.headers), self.remote_ip()
         )
         if self.is_chunked_request():
             body_bytes = self.read_chunked_body()
