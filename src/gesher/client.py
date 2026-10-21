@@ -229,12 +229,13 @@ def post_gateway_response(
 
     encrypted_response = SECURITY.encrypt(json.dumps(response_data))
 
-    requests.post(
+    reply = requests.post(
         f"{gateway_url}/_tunnel_response",
         data=encrypted_response,
         headers={"Authorization": SECURITY.get_auth_header()},
         timeout=GATEWAY_POST_TIMEOUT,
     )
+    return reply.status_code
 
 
 def handle_task(encrypted_payload, local_target, gateway_url):
@@ -299,7 +300,7 @@ def handle_task(encrypted_payload, local_target, gateway_url):
             )
             return
 
-        post_gateway_response(
+        delivered = post_gateway_response(
             gateway_url,
             task["id"],
             resp.status_code,
@@ -307,6 +308,16 @@ def handle_task(encrypted_payload, local_target, gateway_url):
             resp.content,
             response_set_cookies(resp),
         )
+        if delivered == 413:
+            logger.error("❌ Local response is too large for the gateway.")
+            post_gateway_response(
+                gateway_url,
+                task["id"],
+                502,
+                {"Content-Type": "text/plain"},
+                b"Local Response Too Large",
+            )
+            return
         logger.info("📤 Response Sent (Encrypted)")
 
     except Exception as e:
