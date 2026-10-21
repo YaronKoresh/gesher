@@ -138,6 +138,27 @@ def run_local_dashboard(port, gateway_url, pin):
     server.serve_forever()
 
 
+STREAM_READ_SIZE = 65536
+
+
+def iter_stream_lines(response):
+    pending = bytearray()
+    for chunk in response.iter_content(chunk_size=STREAM_READ_SIZE):
+        start = len(pending)
+        pending.extend(chunk)
+        while True:
+            end = pending.find(b"\n", start)
+            if end < 0:
+                break
+            line = bytes(pending[:end])
+            del pending[: end + 1]
+            start = 0
+            if line:
+                yield line
+    if pending:
+        yield bytes(pending)
+
+
 def is_valid_task_url(url):
     if not isinstance(url, str) or not url.startswith("/"):
         return False
@@ -295,7 +316,7 @@ def start_connector(gateway_url, secret, local_target, pin, dashboard_port):
                     "✅ Secure Tunnel Established. Waiting for encrypted tasks..."
                 )
 
-                for line in r.iter_lines():
+                for line in iter_stream_lines(r):
                     if not line:
                         continue
                     try:
