@@ -343,6 +343,10 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
             self.send_error(429, "Too Many Requests")
             return
 
+        if not self.path.startswith("/"):
+            self.send_error(400, "Bad Request Target")
+            return
+
         global NEXT_CLIENT_INDEX
         target_queue = None
 

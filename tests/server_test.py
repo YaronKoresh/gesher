@@ -358,3 +358,19 @@ class TestServer(unittest.TestCase):
                 names = [k for k, _ in self._sent_headers(handler)]
                 self.assertNotIn("content-length", names)
                 handler.wfile.write.assert_not_called()
+
+    def test_handle_public_request_rejects_path_without_leading_slash(self):
+        server.CLIENTS["test-client"] = {
+            "queue": queue.Queue(),
+            "address": ("127.0.0.1", 5000),
+        }
+        for path in ("no-slash", "", "http://other.invalid/", ":80/x"):
+            with self.subTest(path=path):
+                handler = self.create_mock_handler()
+                handler.path = path
+
+                handler.handle_public_request()
+
+                handler.send_error.assert_called_with(400, "Bad Request Target")
+                self.assertTrue(server.CLIENTS["test-client"]["queue"].empty())
+                self.assertEqual(server.PENDING_RESPONSES, {})

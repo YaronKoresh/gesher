@@ -92,3 +92,68 @@ class TestClient(unittest.TestCase):
                 encrypted, "http://localhost:8080", "http://gateway"
             )
             mock_request.assert_not_called()
+
+    @patch("gesher.client.requests.post")
+    @patch("gesher.client.requests.request")
+    def test_handle_task_rejects_path_without_leading_slash(
+        self, mock_request, mock_post
+    ):
+        for url in ("no-slash/x", "", "http://other.invalid/", ":8080/x"):
+            with self.subTest(url=url):
+                mock_request.reset_mock()
+                mock_post.reset_mock()
+                task_data = {"id": "7", "method": "GET", "url": url}
+                encrypted = self.security.encrypt(json.dumps(task_data))
+
+                client.handle_task(
+                    encrypted, "http://localhost:8080", "http://gateway.com"
+                )
+
+                mock_request.assert_not_called()
+                mock_post.assert_called_once()
+                sent = json.loads(
+                    self.security.decrypt(mock_post.call_args.kwargs["data"])
+                )
+                self.assertEqual(sent["id"], "7")
+                self.assertEqual(sent["status"], 400)
+
+    @patch("gesher.client.requests.post")
+    @patch("gesher.client.requests.request")
+    def test_handle_task_rejects_path_with_control_characters(
+        self, mock_request, mock_post
+    ):
+        for url in ("/a b", "/a\r\nb", "/a\x00b", "/a\tb"):
+            with self.subTest(url=url):
+                mock_request.reset_mock()
+                task_data = {"id": "8", "method": "GET", "url": url}
+                encrypted = self.security.encrypt(json.dumps(task_data))
+
+                client.handle_task(
+                    encrypted, "http://localhost:8080", "http://gateway.com"
+                )
+
+                mock_request.assert_not_called()
+
+    @patch("gesher.client.requests.post")
+    @patch("gesher.client.requests.request")
+    def test_handle_task_accepts_normal_paths(self, mock_request, mock_post):
+        mock_local_resp = MagicMock()
+        mock_local_resp.status_code = 200
+        mock_local_resp.headers = {}
+        mock_local_resp.content = b""
+        mock_request.return_value = mock_local_resp
+
+        for url in ("/", "/ok?q=1", "//double/slash", "/a%20b"):
+            with self.subTest(url=url):
+                mock_request.reset_mock()
+                task_data = {"id": "9", "method": "GET", "url": url}
+                encrypted = self.security.encrypt(json.dumps(task_data))
+
+                client.handle_task(
+                    encrypted, "http://localhost:8080", "http://gateway.com"
+                )
+
+                self.assertEqual(
+                    mock_request.call_args.kwargs["url"],
+                    f"http://localhost:8080{url}",
+                )

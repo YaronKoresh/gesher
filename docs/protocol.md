@@ -69,6 +69,8 @@ The Server sends a JSON object on a new line.
 
 ```
 
+**Request Path:** `url` always starts with `/`. The Server answers `400 Bad Request` to a public request whose path does not, and the Client does not forward such a task: it answers it with a `400` response instead.
+
 **Wire Format:**
 
 ```json

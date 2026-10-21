@@ -125,6 +125,29 @@ def run_local_dashboard(port, gateway_url, pin):
     ).serve_forever()
 
 
+def is_valid_task_url(url):
+    if not isinstance(url, str) or not url.startswith("/"):
+        return False
+    return not any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in url)
+
+
+def post_gateway_response(gateway_url, task_id, status, headers, content):
+    response_data = {
+        "id": task_id,
+        "status": status,
+        "headers": headers,
+        "body": base64.b64encode(content).decode("utf-8"),
+    }
+
+    encrypted_response = SECURITY.encrypt(json.dumps(response_data))
+
+    requests.post(
+        f"{gateway_url}/_tunnel_response",
+        data=encrypted_response,
+        headers={"Authorization": SECURITY.get_auth_header()},
+    )
+
+
 def handle_task(encrypted_payload, local_target, gateway_url):
     try:
         try:
@@ -138,6 +161,17 @@ def handle_task(encrypted_payload, local_target, gateway_url):
             if task.get("event") == "client_list":
                 clients = task.get("clients", [])
                 logger.info(f"👥 Network Update: Connected Peers: {clients}")
+            return
+
+        if not is_valid_task_url(task["url"]):
+            logger.error("🛑 Rejected a task with an invalid request path.")
+            post_gateway_response(
+                gateway_url,
+                task["id"],
+                400,
+                {"Content-Type": "text/plain"},
+                b"Bad Request Target",
+            )
             return
 
         logger.info(f"📥 Processing: {task['method']} {task['url']}")
@@ -156,19 +190,12 @@ def handle_task(encrypted_payload, local_target, gateway_url):
             logger.error(f"❌ Local Service Error: {e}")
             return
 
-        response_data = {
-            "id": task["id"],
-            "status": resp.status_code,
-            "headers": dict(resp.headers),
-            "body": base64.b64encode(resp.content).decode("utf-8"),
-        }
-
-        encrypted_response = SECURITY.encrypt(json.dumps(response_data))
-
-        requests.post(
-            f"{gateway_url}/_tunnel_response",
-            data=encrypted_response,
-            headers={"Authorization": SECURITY.get_auth_header()},
+        post_gateway_response(
+            gateway_url,
+            task["id"],
+            resp.status_code,
+            dict(resp.headers),
+            resp.content,
         )
         logger.info("📤 Response Sent (Encrypted)")
 
