@@ -336,6 +336,14 @@ def start_connector(gateway_url, secret, local_target, pin, dashboard_port):
     dash_thread.daemon = True
     dash_thread.start()
 
+    try:
+        return run_tunnel_loop(gateway_url, local_target, pin)
+    except KeyboardInterrupt:
+        logger.info("👋 Client stopped.")
+        return None
+
+
+def run_tunnel_loop(gateway_url, local_target, pin):
     while True:
         try:
             logger.info(f"🔐 Initiating Secure Handshake with {gateway_url}...")

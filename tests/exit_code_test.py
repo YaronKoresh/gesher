@@ -52,5 +52,38 @@ class TestClientExitCode(unittest.TestCase):
             cli.main()
 
 
+class TestClientInterrupt(unittest.TestCase):
+    def interrupted_in(self, patched):
+        with patch("gesher.client.threading.Thread"), patched:
+            return client.start_connector(
+                "http://gateway", "key", "http://local", "PIN", 9999
+            )
+
+    def test_ctrl_c_while_connected_stops_without_a_traceback(self):
+        patched = patch(
+            "gesher.client.requests.post", side_effect=KeyboardInterrupt
+        )
+        self.assertIsNone(self.interrupted_in(patched))
+
+    def test_ctrl_c_while_waiting_to_reconnect_stops_quietly(self):
+        import requests
+
+        patched = patch.multiple(
+            "gesher.client",
+            requests=MagicMock(
+                post=MagicMock(side_effect=requests.exceptions.ConnectionError),
+                exceptions=requests.exceptions,
+            ),
+            time=MagicMock(sleep=MagicMock(side_effect=KeyboardInterrupt)),
+        )
+        self.assertIsNone(self.interrupted_in(patched))
+
+    def test_cli_exits_normally_after_ctrl_c(self):
+        with patch("sys.argv", client_argv()), patch(
+            "gesher.client.threading.Thread"
+        ), patch("gesher.client.requests.post", side_effect=KeyboardInterrupt):
+            cli.main()
+
+
 if __name__ == "__main__":
     unittest.main()
