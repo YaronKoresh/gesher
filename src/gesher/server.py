@@ -244,6 +244,11 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
         pass
 
     def read_content_length(self):
+        get_all = getattr(self.headers, "get_all", None)
+        values = get_all("Content-Length") if callable(get_all) else None
+        if isinstance(values, list) and len(set(values)) > 1:
+            self.send_error(400, "Bad Content-Length")
+            return None
         raw = self.headers.get("Content-Length", "0")
         raw = raw.strip() if isinstance(raw, str) else ""
         if raw.isascii() and raw.isdigit():
@@ -608,6 +613,9 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
 
             self.track_traffic(rx=length)
             body_bytes = self.rfile.read(length) if length > 0 else b""
+            for key in request_headers:
+                if key.lower() == "content-length":
+                    request_headers[key] = str(length)
 
         raw_task = {
             "id": req_id,
