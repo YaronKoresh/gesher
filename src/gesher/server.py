@@ -112,6 +112,25 @@ def prune_rate_state(now):
             del AUTH_FAILURES[ip]
 
 
+def with_forwarded_for(headers, address):
+    name = "X-Forwarded-For"
+    existing = None
+    result = {}
+    for key, item in headers.items():
+        if key.lower() == "x-forwarded-for":
+            name = key
+            existing = item if not existing else f"{existing}, {item}"
+        else:
+            result[key] = item
+    if not existing:
+        value = address
+    else:
+        parts = [part.strip() for part in existing.split(",")]
+        value = existing if parts[-1] == address else f"{existing}, {address}"
+    result[name] = value
+    return result
+
+
 def frame_chunk(data):
     return b"%x\r\n" % len(data) + data + b"\r\n"
 
@@ -489,7 +508,9 @@ class BridgeRequestHandler(http.server.BaseHTTPRequestHandler):
 
         req_id = str(uuid.uuid4())
 
-        request_headers = dict(self.headers)
+        request_headers = with_forwarded_for(
+            dict(self.headers), self.remote_ip()
+        )
         if self.is_chunked_request():
             body_bytes = self.read_chunked_body()
             if body_bytes is None:
