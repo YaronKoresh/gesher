@@ -81,7 +81,16 @@ def install_cloudflared():
         print("Downloading for macOS...")
         urllib.request.urlretrieve(url, "cf.tgz")
         with tarfile.open("cf.tgz", "r:gz") as tar:
-            tar.extractall(filter="data")
+            member = next(
+                (m for m in tar.getmembers() if m.name == "cloudflared"), None
+            )
+            if member is None or not member.isfile():
+                print("❌ The cloudflared archive has no cloudflared file.")
+                return
+            if hasattr(tarfile, "data_filter"):
+                tar.extract(member, filter="data")
+            else:
+                tar.extract(member)
 
         os.chmod("cloudflared", 0o755)
         subprocess.run(

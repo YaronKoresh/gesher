@@ -188,3 +188,85 @@ class TestPublicModeMessage(unittest.TestCase):
         self.assertNotIn("None", output)
         self.assertIn("tunnel.log", output)
         mock_run.assert_called_once()
+
+
+class TestMacInstall(unittest.TestCase):
+    def setUp(self):
+        import os
+        import tempfile
+
+        self._cwd = os.getcwd()
+        self._tmp = tempfile.TemporaryDirectory()
+        os.chdir(self._tmp.name)
+
+    def tearDown(self):
+        import os
+
+        os.chdir(self._cwd)
+        self._tmp.cleanup()
+
+    def _make_archive(self, names):
+        import io
+        import tarfile
+
+        def fake_retrieve(_url, target):
+            with tarfile.open(target, "w:gz") as tar:
+                for name in names:
+                    data = b"binary"
+                    info = tarfile.TarInfo(name)
+                    info.size = len(data)
+                    tar.addfile(info, io.BytesIO(data))
+
+        return fake_retrieve
+
+    def _install(self, names, modern=True):
+        import os
+        import tarfile
+        from unittest.mock import MagicMock
+
+        with patch("gesher.cli.subprocess.run") as run, patch(
+            "gesher.cli.platform.system", return_value="Darwin"
+        ), patch("gesher.cli.platform.machine", return_value="arm64"), patch(
+            "gesher.cli.urllib.request.urlretrieve",
+            side_effect=self._make_archive(names),
+        ), patch("gesher.cli.os.chmod"):
+            run.side_effect = [FileNotFoundError(), MagicMock(), MagicMock()]
+            if modern:
+                cli.install_cloudflared()
+            else:
+                with patch.object(tarfile, "data_filter", create=True):
+                    del tarfile.data_filter
+                    cli.install_cloudflared()
+        return sorted(os.listdir("."))
+
+    def test_only_the_cloudflared_file_is_extracted(self):
+        files = self._install(["cloudflared", "other-file"])
+
+        self.assertIn("cloudflared", files)
+        self.assertNotIn("other-file", files)
+
+    def test_extraction_works_without_the_filter_argument(self):
+        import tarfile
+
+        original = tarfile.TarFile.extract
+
+        def extract_without_filter(self_, member, *args, **kwargs):
+            if "filter" in kwargs:
+                raise TypeError("unexpected keyword argument 'filter'")
+            return original(self_, member, *args, **kwargs)
+
+        with patch.object(tarfile.TarFile, "extract", extract_without_filter):
+            files = self._install(["cloudflared"], modern=False)
+
+        self.assertIn("cloudflared", files)
+
+    def test_archive_without_cloudflared_is_reported(self):
+        import io
+        from contextlib import redirect_stdout
+
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            files = self._install(["other-file"])
+
+        self.assertNotIn("cloudflared", files)
+        self.assertIn("no cloudflared file", buffer.getvalue())
