@@ -16,6 +16,10 @@ logger = logging.getLogger("SecureClient")
 
 SECURITY = None
 
+LOCAL_CONNECT_TIMEOUT = 5
+LOCAL_READ_TIMEOUT = 25
+GATEWAY_POST_TIMEOUT = 15
+
 DASHBOARD_HTML = """
 <!DOCTYPE html>
 <html>
@@ -145,6 +149,7 @@ def post_gateway_response(gateway_url, task_id, status, headers, content):
         f"{gateway_url}/_tunnel_response",
         data=encrypted_response,
         headers={"Authorization": SECURITY.get_auth_header()},
+        timeout=GATEWAY_POST_TIMEOUT,
     )
 
 
@@ -185,9 +190,27 @@ def handle_task(encrypted_payload, local_target, gateway_url):
                 if task.get("body")
                 else None,
                 allow_redirects=False,
+                timeout=(LOCAL_CONNECT_TIMEOUT, LOCAL_READ_TIMEOUT),
             )
+        except requests.exceptions.Timeout as e:
+            logger.error(f"❌ Local Service Timeout: {e}")
+            post_gateway_response(
+                gateway_url,
+                task["id"],
+                504,
+                {"Content-Type": "text/plain"},
+                b"Local Service Timeout",
+            )
+            return
         except Exception as e:
             logger.error(f"❌ Local Service Error: {e}")
+            post_gateway_response(
+                gateway_url,
+                task["id"],
+                502,
+                {"Content-Type": "text/plain"},
+                b"Local Service Unavailable",
+            )
             return
 
         post_gateway_response(

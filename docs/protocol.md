@@ -102,6 +102,8 @@ The Client executes the request locally (e.g., against `localhost:3000`) and pos
 **Wire Format:**
 The body of the POST request is the raw Encrypted Fernet Token (string).
 
+If the local service cannot be reached the Client answers with status `502`, and if it does not answer within 25 seconds with status `504`, using the same endpoint, so the public request ends at once instead of waiting for the Server timeout.
+
 **Responses:**
 * `200 OK`: The response was delivered to the waiting request.
 * `400 Bad Request`: The body is not valid UTF-8, cannot be decrypted, or is not a response object with a string `id`, an integer `status` from 100 to 599, string `headers` and a base64 `body`.

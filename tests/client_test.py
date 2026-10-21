@@ -41,6 +41,7 @@ class TestClient(unittest.TestCase):
             headers=task_data["headers"],
             data=None,
             allow_redirects=False,
+            timeout=(client.LOCAL_CONNECT_TIMEOUT, client.LOCAL_READ_TIMEOUT),
         )
 
         mock_post.assert_called_once()
@@ -59,7 +60,54 @@ class TestClient(unittest.TestCase):
             encrypted_payload, "http://localhost:8080", "http://gateway"
         )
 
-        mock_post.assert_not_called()
+        mock_post.assert_called_once()
+        self.assertEqual(
+            mock_post.call_args[0][0], "http://gateway/_tunnel_response"
+        )
+        sent = json.loads(
+            self.security.decrypt(mock_post.call_args.kwargs["data"])
+        )
+        self.assertEqual(sent["id"], "999")
+        self.assertEqual(sent["status"], 502)
+
+    @patch("gesher.client.requests.post")
+    @patch("gesher.client.requests.request")
+    def test_handle_task_local_service_timeout(self, mock_request, mock_post):
+        task_data = {"id": "998", "method": "GET", "url": "/slow"}
+        encrypted_payload = self.security.encrypt(json.dumps(task_data))
+
+        mock_request.side_effect = requests.exceptions.ReadTimeout
+
+        client.handle_task(
+            encrypted_payload, "http://localhost:8080", "http://gateway"
+        )
+
+        sent = json.loads(
+            self.security.decrypt(mock_post.call_args.kwargs["data"])
+        )
+        self.assertEqual(sent["id"], "998")
+        self.assertEqual(sent["status"], 504)
+
+    @patch("gesher.client.requests.post")
+    @patch("gesher.client.requests.request")
+    def test_handle_task_response_post_has_timeout(
+        self, mock_request, mock_post
+    ):
+        task_data = {"id": "997", "method": "GET", "url": "/"}
+        encrypted_payload = self.security.encrypt(json.dumps(task_data))
+        mock_local_resp = MagicMock()
+        mock_local_resp.status_code = 200
+        mock_local_resp.headers = {}
+        mock_local_resp.content = b""
+        mock_request.return_value = mock_local_resp
+
+        client.handle_task(
+            encrypted_payload, "http://localhost:8080", "http://gateway"
+        )
+
+        self.assertEqual(
+            mock_post.call_args.kwargs["timeout"], client.GATEWAY_POST_TIMEOUT
+        )
 
     @patch("gesher.client.requests.post")
     def test_start_connector_auth_failure(self, mock_post):
